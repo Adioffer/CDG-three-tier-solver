@@ -33,5 +33,6 @@ if __name__ == '__main__':
         closest = test_for_server(frontend)
         results[frontend] = closest
 
-    [print(k, ":", k == v, ", error (km): ", round(Geolocation.haversine(frontend_locations[k], frontend_locations[v]), 2)) \
+    [print(k, ":", k == v, ", error (km): ", round(Geolocation.haversine(frontend_locations[k], frontend_locations[v]), 2), 
+           f'[{v}]') \
      for k,v in results.items()]

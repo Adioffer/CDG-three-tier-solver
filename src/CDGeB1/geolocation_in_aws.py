@@ -52,12 +52,22 @@ class Geolocation:
         """
         Co-Author: Daniel
         """
+        def normalize_coordinates(coord_unnormalized):
+            """
+            Normalizes a given coordinates to the ranges: lat = [-90, 90], lon = [-180, 180].
+            Please read the note in multilateraion.
+            """
+            lat1, lon1 = coord_unnormalized[0], coord_unnormalized[1]
+            lat2 = (lat1 + 90) % 180 - 90
+            lon2 = (lon1 + 180) % 360 - 180
+            return (lat2, lon2)
+        
         def loss_function(current_guess, known_distances, positions):
             distances_from_guess = np.array([cls.haversine(current_guess, probe) for probe in positions])
             return np.sum((distances_from_guess - known_distances) ** 2)
         
-        def triangulate(positions, distances):
-            initial_guess = np.mean(positions, axis=0)
+        def multilateration(positions, distances):
+            initial_guess = positions[np.argmin(distances)]
             # Note: reverted as for some reason many targets where estimated to the bouneries themselves (e.g. [-90,-180]),
             # whereas the estimation without the bounderies was correct.
             # bounds = [(-90, 90), (-180, 180)] # lat, lon boundaries
@@ -66,20 +76,10 @@ class Geolocation:
                               method='L-BFGS-B', options={'disp': False})
             return result.x
         
-        fe_positions = [fe_locations[fe] for fe in distances]
         distances_from_fes = list(distances.values())
+        fe_positions = [fe_locations[fe] for fe in distances]
 
-        def normalize_coordinates(coord_unnormalized):
-            """
-            Normalizes a given coordinates to the ranges: lat = [-90, 90], lon = [-180, 180].
-            Please read the previous note.
-            """
-            lat1, lon1 = coord_unnormalized[0], coord_unnormalized[1]
-            lat2 = (lat1 + 90) % 180 - 90
-            lon2 = (lon1 + 180) % 360 - 180
-            return (lat2, lon2)
-
-        target = triangulate(np.array(fe_positions), np.array(distances_from_fes))
+        target = multilateration(np.array(fe_positions), np.array(distances_from_fes))
         return normalize_coordinates(target)
 
     @classmethod
