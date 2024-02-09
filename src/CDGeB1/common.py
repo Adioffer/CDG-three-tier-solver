@@ -29,6 +29,23 @@ cdgeb_probes = [probeId2Name(probe_id) for probe_id in range(1,14+1)]
 cdgeb_frontends = [frontendId2Name(frontend_id) for frontend_id in range(1,17+1)]
 cdgeb_files = [fileId2Name(file_id) for file_id in range(1,17+1)]
 
+# Real known locations of probe clients
+probe_locations = {
+    'cdgeb-probe-01': (45.5075, -73.5887),
+    'cdgeb-probe-02': (43.6547, -79.3623),
+    'cdgeb-probe-03': (-23.5335, -46.6359),
+    'cdgeb-probe-04': (45.5999, -121.1871),
+    'cdgeb-probe-05': (34.0544, -118.2441),
+    'cdgeb-probe-06': (52.2296, 21.0067),
+    'cdgeb-probe-07': (61.0636, 28.189),
+    'cdgeb-probe-08': (40.4163, -3.6934),
+    'cdgeb-probe-09': (25.2952, 51.5321),
+    'cdgeb-probe-10': (32.0803, 34.7805),
+    'cdgeb-probe-11': (25.0504, 121.5324),
+    'cdgeb-probe-12': (22.2842, 114.1759),
+    'cdgeb-probe-13': (35.6893, 139.6899),
+    'cdgeb-probe-14': (34.6946, 135.5021),
+}
 
 # Real known locations of front-end servers
 frontend_locations = {

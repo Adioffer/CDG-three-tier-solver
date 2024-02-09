@@ -83,7 +83,7 @@ class Geolocation:
         return normalize_coordinates(target)
 
     @classmethod
-    def geolocate_target(cls, measurements: dict, fe_locations: dict):
+    def geolocate_target(cls, fe_locations: dict, measurements: dict):
         """
         Given single-direction delay measurements from multiple front-end servers
         with known locations to a file, geolocate the file.
@@ -103,6 +103,17 @@ class Geolocation:
 
         # return cls._geolocate_using_Localization(fe_locations, distances)
         return cls._geolocate_using_scipy(fe_locations, distances)
+
+    @classmethod
+    def geolocate_target_from_distances(cls, fe_locations: dict, distances: dict):
+        """
+        Similar to geolocate_target.
+        distances: dict(frontend: distance)
+        """
+        assert all(key in fe_locations for key in distances), "Inputs do not match"
+
+        # return cls._geolocate_using_Localization(fe_locations, distances)
+        return cls._geolocate_using_scipy(fe_locations, distances)
     
     @classmethod
     def haversine(cls, coord1, coord2):
@@ -117,7 +128,7 @@ class Geolocation:
         return distance
     
     @classmethod
-    def closest_frontend(cls, target: tuple[float, float], fe_locations: dict) -> tuple:
+    def closest_frontend(cls, fe_locations: dict, target: tuple[float, float]) -> tuple:
         closest_fe = min(fe_locations.items(), key=lambda elem: cls.haversine(target, elem[1]))
 
         return closest_fe[0]

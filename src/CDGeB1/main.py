@@ -11,18 +11,28 @@ from common import frontend_locations, real_fe_for_file, real_file_for_fe
 from common import aws_distances, aws_delays
 
 
-def geolocate_frontend(frontend):
+def _geolocate_frontend(frontend):
     filename = real_file_for_fe[frontend]
     delays_from_server = {frontend_name:aws_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in aws_delays.keys() \
                         if filename_d == filename}
     delays_from_server.pop(frontend)    
     
     # Geolocation
-    estimated_location = Geolocation.geolocate_target(delays_from_server, frontend_locations)
-    closest_frontend = Geolocation.closest_frontend(estimated_location, frontend_locations)
+    if True:
+        # Geolocation from delays
+        estimated_location = Geolocation.geolocate_target(frontend_locations, delays_from_server)
+        map_name_appender = ''
+    else:
+        # Geolocation from distances
+        map_name_appender = '_from_distances'
+        dists_from_server = {src_frontend:aws_distances[(src_frontend, target_filename)] for (src_frontend, target_filename) in aws_distances.keys() \
+                                  if src_frontend != frontend and real_fe_for_file[target_filename] == frontend}
+        estimated_location = Geolocation.geolocate_target_from_distances(frontend_locations, dists_from_server)
+    
+    closest_frontend = Geolocation.closest_frontend(frontend_locations, estimated_location)
 
     # Make map file
-    map = MapBuilder(f'{frontend}_estimated')
+    map = MapBuilder(f'{frontend}_estimated' + map_name_appender)
     map.add_frontends()
     map.add_point(estimated_location, f'estimated-location-of-{frontend}')
     map.add_circle(estimated_location, Geolocation.haversine(estimated_location, frontend_locations[frontend]))
@@ -42,7 +52,7 @@ if __name__ == '__main__':
     results = dict()
     errors = list()
     for frontend in cdgeb_frontends:
-        estimated_location, closest_frontend = geolocate_frontend(frontend)
+        estimated_location, closest_frontend = _geolocate_frontend(frontend)
 
         geolocation_error = Geolocation.haversine(frontend_locations[frontend], estimated_location)
         closest_error = Geolocation.haversine(frontend_locations[frontend], frontend_locations[closest_frontend])
