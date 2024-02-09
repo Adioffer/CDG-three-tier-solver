@@ -67,6 +67,7 @@ class Geolocation:
             return np.sum((distances_from_guess - known_distances) ** 2)
         
         def multilateration(positions, distances):
+            # initial_guess = np.mean(positions, axis=0)
             initial_guess = positions[np.argmin(distances)]
             # Note: reverted as for some reason many targets where estimated to the bouneries themselves (e.g. [-90,-180]),
             # whereas the estimation without the bounderies was correct.
@@ -98,8 +99,8 @@ class Geolocation:
         target_assumed_continent = frontend_continents[assumed_closest_frontend]
 
         # Convert time measurements to distances
-        distances = {fe:cls.delay_to_distance_continent_aware(delay, frontend_continents[fe], target_assumed_continent) \
-                     for fe, delay in measurements.items()}
+        # distances = {fe:cls.delay_to_distance(delay) for fe, delay in measurements.items()}
+        distances = {fe:cls.delay_to_distance_continent_aware(delay, frontend_continents[fe], target_assumed_continent) for fe, delay in measurements.items()}
 
         # return cls._geolocate_using_Localization(fe_locations, distances)
         return cls._geolocate_using_scipy(fe_locations, distances)

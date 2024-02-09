@@ -6,10 +6,10 @@ TODO fix
 from statistics import mean
 from common import cdgeb_probes, cdgeb_frontends, cdgeb_files
 from common import probeId2Name, frontendId2Name, fileId2Name
-from common import closest_probe_to_fe, real_fe_for_file
+from common import closest_probe_to_fe, real_fe_for_file, real_file_for_fe
 
-Input_file = 'full_dataset.csv'
-Output_file = 'delay_fe-file.csv'
+Input_file = 'Measurements\\150823\\full_dataset.csv'
+Output_file = 'out\\out_fe-file_rtts_TMP.csv'
 
 # Build database of all measurements, with the minimum value
 measurements = dict()
@@ -21,39 +21,27 @@ with open(Input_file, 'r') as f:
 # Find the file that matches every front-end server
 best_file_for_fe = dict()
 for frontend in cdgeb_frontends:
-    method = 2
-    
-    match(method):
-        case 1:
-            closest_file = min(measurements.items(),
-                # pair = (key=(probe_name,frontend_name,filename), value=min_rtt)
-                key=lambda pair: pair[1] if \
-                    # probe_name == probename
-                    pair[0][1] == frontend \
-                    else float('inf'))[0][2]
-                    
-        case 2:
-            closest_file = min(measurements.items(),
-                # pair = (key=(probe_name,frontend_name,filename), value=min_rtt)
-                key=lambda pair: pair[1] if \
-                    # front-end == frontent
-                    pair[0][1] == frontend and \
-                    # probe = closest to frontend
-                    pair[0][0] == closest_probe_to_fe[frontend]
-                    else float('inf'))[0][2]
-    
-    if closest_file in best_file_for_fe.values():
-        print(f"{closest_file} matches both {frontend} and {best_fe_for_file[closest_file]}. aborting.")
-        exit()
+    closest_file = min(measurements.items(),
+        # pair = (key=(probe_name,frontend_name,filename), value=min_rtt)
+        key=lambda pair: pair[1] if \
+            # front-end == frontent
+            pair[0][1] == frontend and \
+            # probe = closest to frontend
+            pair[0][0] == closest_probe_to_fe[frontend]
+            else float('inf'))[0][2]
     best_file_for_fe[frontend] = closest_file
 
-print(best_file_for_fe)
-exit(0)
+print("Frontend-File mapping:")
+for frontend in best_file_for_fe:
+    print(frontend, ":", best_file_for_fe[frontend],
+          "[V]" if best_file_for_fe[frontend] == real_file_for_fe[frontend] else "[{real_file_for_fe[frontend]}]")
 
 
-# Print the results, compare with known results
-print("filename\texpected\tcomputed")
-[print(filename, a:=real_fe_for_file[filename], b:=best_fe_for_file[filename], '[V]' if a == b else '[]', sep='\t') for filename in cdgeb_files]
+# Ad-hoc: fix "closest_probe_to_fe" according to is_closer_better results
+# closest_probe_to_fe[frontendId2Name(1)] = probeId2Name(1)
+# closest_probe_to_fe[frontendId2Name(7)] = probeId2Name(1)
+# closest_probe_to_fe[frontendId2Name(13)] = probeId2Name(13)
+
 
 # Compute the round-trip times of the second hop (front-end to file)
 rtts_scnd_tier = dict()
@@ -76,6 +64,5 @@ with open(Output_file, 'w', newline='') as csvfile:
 
     # Write the data rows
     for frontend in cdgeb_frontends:
-        row_data = [frontend] + [rtts_scnd_tier[(frontend, filename)] for filename in cdgeb_files]
+        row_data = [frontend] + [round(rtts_scnd_tier[(frontend, filename)], 6) for filename in cdgeb_files]
         csvwriter.writerow(row_data)
-

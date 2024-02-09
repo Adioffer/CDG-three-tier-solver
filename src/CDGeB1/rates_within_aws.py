@@ -68,5 +68,6 @@ def pretty_print(rates):
 
 rates = rates_aws()
 
-print(rates)
+# print(str(rates).replace('<Continent.AS: \'', '').replace('<Continent.EU: \'', '').replace('<Continent.AMN: \'', '').replace('<Continent.AU: \'', '').replace('<Continent.ANS: \'', '').replace('\'>', ''))
+print(str(rates).replace('<','').replace(': \'Asia\'>', '').replace(': \'Europe\'>', '').replace(': \'N. America\'>', '').replace(': \'S. America\'>', '').replace(': \'Australia\'>', '').replace('inf', 'float(\'inf\')'))
 pretty_print(rates)

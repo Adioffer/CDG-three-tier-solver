@@ -2,6 +2,7 @@ from enum import StrEnum, auto
 
 Distances_csv = 'Measurements\\150823\\out_aws-aws_distances.csv'
 Aws_delays_csv = 'Measurements\\150823\\out_fe-file_rtts.csv'
+# Aws_delays_csv = 'Measurements\\150823\\out_fe-file_rtts_best_probe2frontend.csv'
 Full_dataset_path = 'Measurements\\150823\\full_dataset.csv'
 
 __all__ = [
@@ -98,7 +99,10 @@ frontend_continents = {
 
 aws_general_rate = 122327.002
 
+# For closest probe to frontend:
 aws_rates = {(Continent.AS, Continent.AS): 102356.44, (Continent.AS, Continent.EU): 93725.71, (Continent.AS, Continent.AMN): 143517.57, (Continent.AS, Continent.AMS): 122182.88, (Continent.AS, Continent.AU): 130212.12, (Continent.EU, Continent.AS): 92885.87, (Continent.EU, Continent.EU): 93627.7, (Continent.EU, Continent.AMN): 124836.04, (Continent.EU, Continent.AMS): 98100.46, (Continent.EU, Continent.AU): 124436.58, (Continent.AMN, Continent.AS): 141513.06, (Continent.AMN, Continent.EU): 124629.63, (Continent.AMN, Continent.AMN): 115453.69, (Continent.AMN, Continent.AMS): 123053.64, (Continent.AMN, Continent.AU): 164926.93, (Continent.AMS, Continent.AS): 125062.16, (Continent.AMS, Continent.EU): 103199.75, (Continent.AMS, Continent.AMN): 131991.45, (Continent.AMS, Continent.AMS): float('inf'), (Continent.AMS, Continent.AU): 86855.66, (Continent.AU, Continent.AS): 131804.0, (Continent.AU, Continent.EU): 125483.25, (Continent.AU, Continent.AMN): 167488.0, (Continent.AU, Continent.AMS): 85826.62, (Continent.AU, Continent.AU): float('inf')}
+# For "best" probe to frontend:
+# aws_rates = {(Continent.AS, Continent.AS): 102356.44, (Continent.AS, Continent.EU): 93725.71, (Continent.AS, Continent.AMN): 143517.57, (Continent.AS, Continent.AMS): 122182.88, (Continent.AS, Continent.AU): 130212.12, (Continent.EU, Continent.AS): 92885.87, (Continent.EU, Continent.EU): 93627.7, (Continent.EU, Continent.AMN): 124836.04, (Continent.EU, Continent.AMS): 98100.46, (Continent.EU, Continent.AU): 124436.58, (Continent.AMN, Continent.AS): 141751.64, (Continent.AMN, Continent.EU): 124709.25, (Continent.AMN, Continent.AMN): 115613.47, (Continent.AMN, Continent.AMS): 122941.26, (Continent.AMN, Continent.AU): 165579.9, (Continent.AMS, Continent.AS): 125062.16, (Continent.AMS, Continent.EU): 103199.75, (Continent.AMS, Continent.AMN): 131991.45, (Continent.AMS, Continent.AMS): float('inf'), (Continent.AMS, Continent.AU): 86855.66, (Continent.AU, Continent.AS): 131611.72, (Continent.AU, Continent.EU): 125774.77, (Continent.AU, Continent.AMN): 166745.01, (Continent.AU, Continent.AMS): 86047.49, (Continent.AU, Continent.AU): float('inf')}
 
 # The closest probe to each front-end server
 # (Data has been computed from advance)
