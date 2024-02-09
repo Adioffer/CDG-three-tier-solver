@@ -5,7 +5,6 @@ Code output is provided below.
 """
 
 from common import cdgeb_probes, cdgeb_frontends, cdgeb_files
-from common import probeId2Name, frontendId2Name, fileId2Name
 from common import closest_probe_to_fe
 from common import Full_dataset_path
 
