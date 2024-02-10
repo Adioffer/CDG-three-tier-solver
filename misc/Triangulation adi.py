@@ -16,12 +16,6 @@ def objective_function(pos, dist, probes):
     distances = np.array([haversine_distance(pos, probe) for probe in probes])
     return np.sum((distances - dist) ** 2)
 def triangulate(probe_positions, distances):
-    print(len(probe_positions))
-    print(len(distances))
-    print(probe_positions)
-    print()
-    print(distances)
-    exit(0)
     initial_guess = np.mean(probe_positions, axis=0)
     result = minimize(objective_function, initial_guess, args=(distances, probe_positions), method='L-BFGS-B', options={'disp': True})
     return result.x

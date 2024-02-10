@@ -41,13 +41,18 @@ def _geolocate_frontend(frontend):
     return estimated_location, closest_frontend
 
 if __name__ == '__main__':
-    # Create a Rich table
+    # Create a Rich table for results
     table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
 
     table.add_column("Taget", justify="center")
     table.add_column("Geolocation Error \[km]", justify="center")
     table.add_column("Closest Frontend", justify="center")
     table.add_column("Closest Frontend Error \[km]", justify="center")
+
+    # Create map of all geolocated targets
+    map = MapBuilder(f'all_targets')
+    map.add_frontends()
+
 
     results = dict()
     errors = list()
@@ -63,6 +68,9 @@ if __name__ == '__main__':
                       str(closest_frontend == frontend), \
                       str(round(closest_error, 2))
                     )
+        
+        map.add_point(estimated_location, f'estimated-location-of-{frontend}',
+                      color="green" if closest_frontend == frontend else "red")
 
     # Print the table
     console = Console()
@@ -73,3 +81,6 @@ if __name__ == '__main__':
     mse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
     print("Closest Geolocation Error (MSE): ", round(mse_error, 2), "[km]")
     print()
+
+    # Save the map
+    map.save_map()
