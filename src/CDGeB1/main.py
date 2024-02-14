@@ -76,10 +76,10 @@ if __name__ == '__main__':
     console = Console()
     console.print(table)
 
-    mse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
-    print("Geolocation Error (MSE): ", round(mse_error, 2), "[km]")
-    mse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
-    print("Closest Geolocation Error (MSE): ", round(mse_error, 2), "[km]")
+    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
+    print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
+    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
+    print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
     print()
 
     # Save the map
