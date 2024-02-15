@@ -6,7 +6,7 @@ TODO fix
 from statistics import mean
 from common import cdgeb_probes, cdgeb_frontends, cdgeb_files
 from common import probeId2Name, frontendId2Name, fileId2Name
-from common import closest_probe_to_fe, real_fe_for_file, real_file_for_fe
+from common import closest_probe_to_fe, true_fe_for_file, true_file_for_fe
 
 Input_file = 'Measurements\\150823\\full_dataset.csv'
 Output_file = 'out\\out_fe-file_rtts_TMP.csv'
@@ -34,7 +34,7 @@ for frontend in cdgeb_frontends:
 print("Frontend-File mapping:")
 for frontend in best_file_for_fe:
     print(frontend, ":", best_file_for_fe[frontend],
-          "[V]" if best_file_for_fe[frontend] == real_file_for_fe[frontend] else "[{real_file_for_fe[frontend]}]")
+          "[V]" if best_file_for_fe[frontend] == true_file_for_fe[frontend] else "[{true_file_for_fe[frontend]}]")
 
 
 # Ad-hoc: fix "closest_probe_to_fe" according to is_closer_better results

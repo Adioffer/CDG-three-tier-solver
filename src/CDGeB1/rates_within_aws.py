@@ -3,7 +3,7 @@ from common import Continent, frontend_continents
 from common import probeId2Name, frontendId2Name, fileId2Name
 from common import cdgeb_probes, cdgeb_frontends, cdgeb_files
 from common import aws_delays, aws_distances
-from common import real_fe_for_file
+from common import true_fe_for_file
 
 
 def evaluate_rates(filter_allow):
@@ -35,7 +35,7 @@ def rates_aws():
     for continent_a in Continent:
         for continent_b in Continent:
             rate = evaluate_rates(lambda frontend, filename: ((frontend_continents[frontend] == continent_a) and \
-                                                (frontend_continents[real_fe_for_file[filename]] == continent_b)))
+                                                (frontend_continents[true_fe_for_file[filename]] == continent_b)))
             print(f'Rates within AWS ({continent_a} to {continent_b}):', rate)
             rates[(continent_a, continent_b)] = rate
     

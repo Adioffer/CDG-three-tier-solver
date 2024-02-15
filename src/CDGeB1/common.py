@@ -10,7 +10,7 @@ __all__ = [
     'cdgeb_probes', 'cdgeb_frontends', 'cdgeb_files',
     'frontend_locations',
     'closest_probe_to_fe',
-    'real_fe_for_file', 'real_file_for_fe',
+    'true_fe_for_file', 'true_file_for_fe',
     'aws_distances', 'aws_delays',
 
 ]
@@ -127,7 +127,7 @@ closest_probe_to_fe = {
 }
 
 # The real mapping between files and front-end servers
-real_fe_for_file = {
+true_fe_for_file = {
     'cdgeb-file-01': 'cdgeb-server-04',
     'cdgeb-file-02': 'cdgeb-server-14',
     'cdgeb-file-03': 'cdgeb-server-12',
@@ -146,7 +146,7 @@ real_fe_for_file = {
     'cdgeb-file-16': 'cdgeb-server-03',
     'cdgeb-file-17': 'cdgeb-server-11',
 }
-real_file_for_fe = {v:k for k,v in real_fe_for_file.items()}
+true_file_for_fe = {v:k for k,v in true_fe_for_file.items()}
 
 def _serialize_distances_csv():
     with open(Distances_csv, 'r') as f:
@@ -166,9 +166,9 @@ def _serialize_distances_csv():
                 continue
 
             # This is because: file-X is not placed on the X'th datacenter,
-            # rather file-Y, where Y<->X is defined by real_file_for_fe
+            # rather file-Y, where Y<->X is defined by true_file_for_fe
             tmp_frontend = frontendId2Name(column_number)
-            filename = real_file_for_fe[tmp_frontend]
+            filename = true_file_for_fe[tmp_frontend]
             distances[(frontend, filename)] = float(dist)
 
     return distances
