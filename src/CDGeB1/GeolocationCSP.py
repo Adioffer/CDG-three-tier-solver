@@ -2,26 +2,17 @@ import localization as lx
 import numpy as np
 from scipy.optimize import minimize
 from common import Continent # for content-aware
+from GeolocationUtils import GeolocationUtils
 
 
-class Geolocation:
-    @classmethod
-    def haversine(cls, coord1, coord2):
-        lat1, lon1 = np.radians(coord1)
-        lat2, lon2 = np.radians(coord2)
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-        distance = 6371.0 * c  # Radius of Earth in kilometers
-
-        return distance
-    
+class Geolocation():
     def __init__(self, fe_locations: dict,
                  csp_general_rate: float=None, csp_rates: dict=None, frontend_continents: dict =None):
         """
-        @param fe_locations: dict of front-end names and their (lat, long) coordinates
-        ... TODO
+        @param fe_locations: dict of front-end names and their (lat, long) coordinates.
+        @param csp_general_rate: a float value of transmission rate within the CSP's network. Optional.
+        @param csp_rates: dict of (Continent, Continent) and their corresponding transmission rate. Optional (if csp_general_rate is supplied).
+        @param frontend_continents: a dict mapping between front-end servers and their Continent. Required if csp_rates supplied.
         """
         
         self.fe_locations = fe_locations
@@ -69,6 +60,7 @@ class Geolocation:
 
     def _geolocate_using_scipy(self, distances):
         """
+        This method uses scipy's minimize to geolocate the target.
         Co-Author: Daniel
         """
         def normalize_coordinates(coord_unnormalized):
@@ -82,7 +74,7 @@ class Geolocation:
             return (lat2, lon2)
         
         def loss_function(current_guess, known_distances, positions):
-            distances_from_guess = np.array([self.haversine(current_guess, probe) for probe in positions])
+            distances_from_guess = np.array([GeolocationUtils.haversine(current_guess, probe) for probe in positions])
             return np.sum((distances_from_guess - known_distances) ** 2)
         
         def multilateration(positions, distances):
@@ -102,29 +94,29 @@ class Geolocation:
         target = multilateration(np.array(fe_positions), np.array(distances_from_fes))
         return normalize_coordinates(target)
 
-    def geolocate_target(self, measurements: dict):
+    def geolocate_target(self, measurements_to_target: dict):
         """
         Given single-direction delay measurements from multiple front-end servers
         with known locations to a file, geolocate the file.
         
-        @param measurements: dict of front-end names and their *single-direction delays* (not RTT!) to the file
+        @param measurements_to_target: dict of front-end names and their *single-direction delays* (not RTT!) to a single target file
         
         return: (lat, long) coordinates of the file
         """
 
         assert all(frontend in self.fe_locations \
-                   for frontend in measurements), "Inputs do not match (measurements, fe_locations)"
+                   for frontend in measurements_to_target), "Inputs do not match (measurements_to_target, fe_locations)"
         
         if self.frontend_continents:
             assert all(frontend in self.frontend_continents \
-                       for frontend in measurements), "Inputs do not match (measurements, frontend_continents)"
+                       for frontend in measurements_to_target), "Inputs do not match (measurements_to_target, frontend_continents)"
 
-        assumed_closest_frontend = min(measurements, key=measurements.get)
+        assumed_closest_frontend = min(measurements_to_target, key=measurements_to_target.get)
         target_assumed_continent = self.frontend_continents[assumed_closest_frontend]
 
         # Convert time measurements to distances
-        # distances = {fe:self.delay_to_distance(delay) for fe, delay in measurements.items()}
-        distances = {fe:self.delay_to_distance_continent_aware(delay, self.frontend_continents[fe], target_assumed_continent) for fe, delay in measurements.items()}
+        # distances = {fe:self.delay_to_distance(delay) for fe, delay in measurements_to_target.items()}
+        distances = {fe:self.delay_to_distance_continent_aware(delay, self.frontend_continents[fe], target_assumed_continent) for fe, delay in measurements_to_target.items()}
 
         # return self._geolocate_using_Localization(distances)
         return self._geolocate_using_scipy(distances)
@@ -132,7 +124,7 @@ class Geolocation:
     def geolocate_target_from_distances(self, distances: dict):
         """
         Similar to geolocate_target, but uses given distances instead of delay measurements.
-        distances: dict(frontend: distance)
+        @param distances: dict(frontend: distance)
         """
         assert all(frontend in self.fe_locations \
                    for frontend in distances), "Inputs do not match (distances, fe_locations)"
@@ -141,28 +133,12 @@ class Geolocation:
         return self._geolocate_using_scipy(distances)
     
     def closest_frontend(self, target: tuple[float, float]) -> tuple:
-        closest_fe = min(self.fe_locations.items(), key=lambda elem: self.haversine(target, elem[1]))
+        """
+        Return the closest front-end server to the given coordinates.
+        
+        @param target: Target's coordinates.
+        """
+        closest_fe = min(self.fe_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1]))
 
         return closest_fe[0]
     
-    def test_geolocate_using_scipy(self):
-        from common import frontendId2Name, true_fe_for_file, aws_distances, frontend_locations
-        from plot_map import MapBuilder
-        
-        for target_frontend_id in range(1, 17+1):
-            target_frontend = frontendId2Name(target_frontend_id)
-            # Build measurements setup using real known distances:
-            dists_from_server = {src_frontend:aws_distances[(src_frontend, target_filename)] for (src_frontend, target_filename) in aws_distances.keys() \
-                                if true_fe_for_file[target_filename] == target_frontend}
-            dists_from_server.pop(target_frontend)
-
-            target = self._geolocate_using_scipy(dists_from_server)
-            
-            map = MapBuilder(f'true_distances_{target_frontend_id}')
-            map.add_frontends()
-            map.add_point(target, f'estimated-location-of-server-{target_frontend_id}')
-            map.add_circle(target, Geolocation.haversine(target, frontend_locations[target_frontend]))
-            map.save_map()
-
-## test _geolocate_using_scipy
-# Geolocation.test_geolocate_using_scipy()
