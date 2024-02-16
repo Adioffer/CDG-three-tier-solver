@@ -10,6 +10,7 @@ from rich.table import Table
 
 DATASET_FILE = 'full_dataset.csv'
 PROBES_DATA_FILE = 'probes.csv'
+SERVERS_DATA_FILE = 'servers.csv'
 FRONTENDS_DATA_FILE = 'frontends.csv'
 FILES_DATA_FILE = 'files.csv'
 MAPPING_DATA_FILE = 'mapping.csv'
@@ -22,14 +23,8 @@ def check_files_exist(Input_dir):
     if not os.path.isfile(os.path.join(Input_dir, PROBES_DATA_FILE)):
         print("Missing file", PROBES_DATA_FILE)
         return False
-    if not os.path.isfile(os.path.join(Input_dir, FRONTENDS_DATA_FILE)):
+    if not os.path.isfile(os.path.join(Input_dir, SERVERS_DATA_FILE)):
         print("Missing file", FRONTENDS_DATA_FILE)
-        return False
-    if not os.path.isfile(os.path.join(Input_dir, FILES_DATA_FILE)):
-        print("Missing file", FILES_DATA_FILE)
-        return False
-    if not os.path.isfile(os.path.join(Input_dir, MAPPING_DATA_FILE)):
-        print("Missing file", MAPPING_DATA_FILE)
         return False
     return True
 
@@ -43,8 +38,7 @@ def geolocation_main(Input_dir, Output_dir):
     table.add_column("Closest Frontend", justify="center")
     table.add_column("Closest Frontend Error \[km]", justify="center")
 
-    # Stage 0 - parsing data
-
+    # Stage 0 - parse data
     # Load measurements from CSV
     measurements_to_all_targets = dict()
     with open(os.path.join(Input_dir, DATASET_FILE), 'r') as f:
@@ -62,36 +56,25 @@ def geolocation_main(Input_dir, Output_dir):
             probe, lat, long, continent = line.split(',')[0:4]
             probe_locations[probe] = (float(lat), float(long))
             # probes_continents[probe] = Continent(continent)
-            
+    
     frontend_locations = dict()
     frontend_continents = dict()
-    with open(os.path.join(Input_dir, FRONTENDS_DATA_FILE), 'r') as f:
+    file_locations = dict()
+    file_continents = dict()
+    true_frontend_file_mapping = dict()
+    with open(os.path.join(Input_dir, SERVERS_DATA_FILE), 'r') as f:
         for line in f.readlines():
             line = line.replace('\r','').replace('\n','')
-            frontend, lat, long, continent = line.split(',')[0:4]
+            frontend, filename, lat, long, continent = line.split(',')[0:5]
             frontend_locations[frontend] = (float(lat), float(long))
             frontend_continents[frontend] = Continent(continent)
+            file_locations[filename] = (float(lat), float(long))
+            file_continents[filename] = Continent(continent)
+            true_frontend_file_mapping[frontend] = filename
 
-    file_locations = dict()
-    files_continents = dict()
-    with open(os.path.join(Input_dir, FILES_DATA_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r','').replace('\n','')
-            file, lat, long, continent = line.split(',')[0:4]
-            file_locations[file] = (float(lat), float(long))
-            files_continents[file] = Continent(continent)
-
-    true_frontend_file_mapping = dict()
-    with open(os.path.join(Input_dir, MAPPING_DATA_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r','').replace('\n','')
-            frontend, file = line.split(',')[0:2]
-            true_frontend_file_mapping[frontend] = file
     true_file_frontend_mapping = {v:k for k,v in true_frontend_file_mapping.items()}
 
-
     # Stage 1 - Compute delays within CSP
-    
     cdgeb_geolocation_utils = GeolocationUtils(
         true_file_frontend_mapping=true_file_frontend_mapping,
         probe_locations=probe_locations,
@@ -111,8 +94,8 @@ def geolocation_main(Input_dir, Output_dir):
     rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_to_all_targets)
     cdgeb_geolocation_utils.csp_delays = {k:v/2 for k,v in rtts_within_csp.items()}
 
-    # Print results
-    print()
+    # Save results
+    # TODO
 
     # Stage 2 - Compute transmission rates within CSP
     csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
@@ -123,7 +106,7 @@ def geolocation_main(Input_dir, Output_dir):
     GeolocationUtils.pretty_print_rates(csp_rates)
 
 
-    # Stage 3 - Geolocation
+    # Stages 3-5 - Geolocation
     # Create map of all geolocated targets
     map_all_targets = MapBuilder(f'all_targets', probe_locations, frontend_locations)
     map_all_targets.add_frontends()
@@ -141,15 +124,18 @@ def geolocation_main(Input_dir, Output_dir):
                             if filename_d == filename}
         delays_from_server.pop(frontend)
 
+        # Geolocation step
         estimated_location = aws_geolocator.geolocate_target(delays_from_server)
         closest_frontend = aws_geolocator.closest_frontend(estimated_location)
         
-        # Make map file
+        # Make target-specific map file
         map_single_target = MapBuilder(f'{frontend}_estimated', probe_locations, frontend_locations)
         map_single_target.add_frontends()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{frontend}')
         map_single_target.add_circle(estimated_location, GeolocationUtils.haversine(estimated_location, frontend_locations[frontend]))
-        map_single_target.save_map(os.path.join(Input_dir, Output_dir))
+        map_single_target.add_dashed_line(estimated_location, frontend_locations[frontend])
+        map_single_target.add_line(estimated_location, frontend_locations[closest_frontend])
+        map_single_target.save_map(Output_dir)
 
         # Calculate errors
         geolocation_error = GeolocationUtils.haversine(frontend_locations[frontend], estimated_location)
@@ -176,7 +162,7 @@ def geolocation_main(Input_dir, Output_dir):
     print()
 
     # Save the map
-    map_all_targets.save_map(os.path.join(Input_dir, Output_dir))
+    map_all_targets.save_map(Output_dir)
 
 
 def main(Input_dir, Output_dir=None):
@@ -188,12 +174,12 @@ def main(Input_dir, Output_dir=None):
         return
     
     # Create output directory if not exist
-    if not os.path.isdir(os.path.join(Input_dir, Output_dir)):
-       os.makedirs(os.path.join(Input_dir, Output_dir))
+    if not os.path.isdir(Output_dir):
+       os.makedirs(Output_dir)
     
     geolocation_main(Input_dir, Output_dir)
 
 
 if __name__ == '__main__':
-    Input_dir = 'tmp'
+    Input_dir = 'example'
     main(Input_dir)

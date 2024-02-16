@@ -1,6 +1,7 @@
 import numpy as np
 from common import Continent
 
+
 class GeolocationUtils():
     """
     This class is used before geolocation a target.

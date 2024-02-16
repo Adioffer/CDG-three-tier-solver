@@ -51,6 +51,12 @@ class MapBuilder:
         folium.Circle(location=center, radius=1000*radius, color='blue', fill=True, fill_color='blue',
                     fill_opacity=0.03).add_to(self.map)
 
+    def add_dashed_line(self, start, end, color='blue'):
+        folium.PolyLine([start, end], color=color, dash_array='10, 10').add_to(self.map)
+
+    def add_line(self, start, end, color='green'):
+        folium.PolyLine([start, end], color=color).add_to(self.map)
+
     def save_map(self, path):
         self.map.save(os.path.join(path, self.map_name))
 
