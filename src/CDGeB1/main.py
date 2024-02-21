@@ -29,16 +29,7 @@ def check_files_exist(Input_dir):
     return True
 
 
-def geolocation_main(Input_dir, Output_dir):
-    # Create a Rich table for results
-    table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
-
-    table.add_column("Taget", justify="center")
-    table.add_column("Geolocation Error \[km]", justify="center")
-    table.add_column("Closest Frontend", justify="center")
-    table.add_column("Closest Frontend Error \[km]", justify="center")
-
-    # Stage 0 - parse data
+def parse_datasets(Input_dir):
     # Load measurements from CSV
     measurements_to_all_targets = dict()
     with open(os.path.join(Input_dir, DATASET_FILE), 'r') as f:
@@ -74,6 +65,10 @@ def geolocation_main(Input_dir, Output_dir):
 
     true_file_frontend_mapping = {v:k for k,v in true_frontend_file_mapping.items()}
 
+    return measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping
+
+
+def learn_from_data(measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping):
     # Stage 1 - Compute delays within CSP
     cdgeb_geolocation_utils = GeolocationUtils(
         true_file_frontend_mapping=true_file_frontend_mapping,
@@ -92,7 +87,8 @@ def geolocation_main(Input_dir, Output_dir):
     cdgeb_geolocation_utils.closest_file_for_frontend = closest_file_for_frontend
 
     rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_to_all_targets)
-    cdgeb_geolocation_utils.csp_delays = {k:v/2 for k,v in rtts_within_csp.items()}
+    csp_delays = {k:v/2 for k,v in rtts_within_csp.items()}
+    cdgeb_geolocation_utils.csp_delays = csp_delays
 
     # Save results
     # TODO
@@ -105,6 +101,22 @@ def geolocation_main(Input_dir, Output_dir):
     print("Rates within AWS (All measuremenets):", csp_general_rate)
     GeolocationUtils.pretty_print_rates(csp_rates)
 
+    return csp_delays, csp_general_rate, csp_rates
+
+
+def geolocate_from_data(probe_locations, # Used for map creation
+                        frontend_locations, frontend_continents, # used for geolocation
+                        file_locations, true_frontend_file_mapping, true_file_frontend_mapping, # Used for building geolocation setup
+                        csp_delays, csp_rates, # used for geolocation
+                        Output_dir
+                        ):
+    # Create a Rich table for results
+    table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
+
+    table.add_column("Taget", justify="center")
+    table.add_column("Geolocation Error \[km]", justify="center")
+    table.add_column("Closest Frontend", justify="center")
+    table.add_column("Closest Frontend Error \[km]", justify="center")
 
     # Stages 3-5 - Geolocation
     # Create map of all geolocated targets
@@ -120,7 +132,7 @@ def geolocation_main(Input_dir, Output_dir):
         # Geolocate current file using measurements from other frontends
         frontend = true_file_frontend_mapping[filename]
         filename = true_frontend_file_mapping[frontend]
-        delays_from_server = {frontend_name:cdgeb_geolocation_utils.csp_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in cdgeb_geolocation_utils.csp_delays.keys() \
+        delays_from_server = {frontend_name:csp_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in csp_delays.keys() \
                             if filename_d == filename}
         delays_from_server.pop(frontend)
 
@@ -165,6 +177,17 @@ def geolocation_main(Input_dir, Output_dir):
     map_all_targets.save_map(Output_dir)
 
 
+def geolocation_main(Input_dir, Output_dir):
+    # extra caution is needed here ;)
+    measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping = \
+        parse_datasets(Input_dir)
+    
+    csp_delays, csp_general_rate, csp_rates = learn_from_data(measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping)
+
+    # TODO: csp_rates should actually be recalculated in the geolocate_from_data function (to represent the 'user' rtts and not the 'geolocator' rtts)
+    geolocate_from_data(probe_locations, frontend_locations, frontend_continents, file_locations, true_frontend_file_mapping, true_file_frontend_mapping, csp_delays, csp_rates, Output_dir)
+
+
 def main(Input_dir, Output_dir=None):
     if not Output_dir:
         Output_dir = os.path.join(Input_dir, 'out')
@@ -181,5 +204,5 @@ def main(Input_dir, Output_dir=None):
 
 
 if __name__ == '__main__':
-    Input_dir = 'example'
+    Input_dir = 'Datasets' + os.sep + 'BGU-150823'
     main(Input_dir)
