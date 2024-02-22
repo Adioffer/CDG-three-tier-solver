@@ -1,5 +1,8 @@
 import numpy as np
 from common import Continent
+import warnings
+
+warnings.filterwarnings("ignore", "divide by zero encountered in scalar divide", category=RuntimeWarning)
 
 
 class GeolocationUtils():

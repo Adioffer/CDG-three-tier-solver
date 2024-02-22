@@ -6,6 +6,7 @@ import zipfile
 import subprocess
 from time import sleep
 import shutil
+import sys
 
 class WebRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -35,14 +36,12 @@ class WebRequestHandler(BaseHTTPRequestHandler):
         with tempfile.TemporaryDirectory() as working_dir:
 
             zip_file_path = os.path.join(working_dir, "uploaded.zip")
-            input_path = os.path.join(working_dir, 'input', os.sep)
-            output_path = os.path.join(working_dir, 'output', os.sep)
-   
-            # Create output directory if not exist
-            if not os.path.isdir(input_path):
-                os.makedirs(input_path)
-            if not os.path.isdir(output_path):
-                os.makedirs(output_path)
+            input_path = os.path.join(working_dir, 'input')
+            output_path = os.path.join(working_dir, 'output')
+
+            # Create input and output directories if they do not exist
+            os.makedirs(input_path, exist_ok=True)
+            os.makedirs(output_path, exist_ok=True)
             
             # Save the ZIP file
             with open(zip_file_path, 'wb') as temp_zip:
@@ -60,7 +59,7 @@ class WebRequestHandler(BaseHTTPRequestHandler):
             # Create a temporary file for the subprocess output
             temp_output_path = os.path.join(output_path, "results.txt")
             with open(temp_output_path, 'w+') as temp_output:
-                subprocess.run(["python3", "mypythoncode.py", input_path, output_path], stdout=temp_output, stderr=subprocess.STDOUT)
+                subprocess.run(["python", "main.py", input_path, output_path], stdout=temp_output, stderr=subprocess.STDOUT)
                 
             # Let it run
             sleep(5)
