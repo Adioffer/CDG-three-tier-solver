@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from common import probeId2Name, frontendId2Name, fileId2Name
 from common import cdgeb_probes, cdgeb_frontends, cdgeb_files
 from common import aws_delays, aws_distances
-from common import real_fe_for_file, real_file_for_fe
+from common import true_fe_for_file, true_file_for_fe
 
 
 def scatterplot_within_aws():
@@ -51,10 +51,10 @@ def scatterplot_within_aws_12_17():
             delay = aws_delays[(frontend, filename)]
 
 
-            if frontend == 'cdgeb-server-12' or filename == real_file_for_fe['cdgeb-server-12']:
+            if frontend == 'cdgeb-server-12' or filename == true_file_for_fe['cdgeb-server-12']:
                 Xs12.append(distance)
                 Ys12.append(delay)
-            elif frontend == 'cdgeb-server-17' or filename == real_file_for_fe['cdgeb-server-17']:
+            elif frontend == 'cdgeb-server-17' or filename == true_file_for_fe['cdgeb-server-17']:
                 # some server-17 measurements will match with previous block and will not get here.
                 Xs17.append(distance)
                 Ys17.append(delay)

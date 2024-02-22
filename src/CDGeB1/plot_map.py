@@ -7,34 +7,38 @@ Example usage:
 """
 
 import folium
-from common import probe_locations, frontend_locations
+import os
 
 
 class MapBuilder:
-    def __init__(self, map_name=''):
+    def __init__(self, map_name='', probe_locations = None, frontend_locations = None):
         self.map = folium.Map(location=(0, 0), zoom_start=2)
-        self.map_name = f'out\\map_{map_name}.html'
+        self.map_name = f'map_{map_name}.html'
+        self.probe_locations = probe_locations
+        self.frontend_locations = frontend_locations
 
     def add_probes(self):
         # Display all probes
-        for probe_name, coordinates in probe_locations.items():
-            # Note: some probes have same location as frontend servers, and folium fails to display them both.
-            # Therefore, a slight delta is added. (157 km)
-            new_coords = (coordinates[0] + 1, coordinates[1] + 1)
-            folium.Marker(location=new_coords, 
-                            popup=f'{probe_name}: {str(coordinates)}', 
-                            tooltip=probe_name,
-                            icon=folium.Icon(color='darkgreen', icon='satellite-dish', prefix='fa')
-                            ).add_to(self.map)
+        if self.probe_locations:
+            for probe_name, coordinates in self.probe_locations.items():
+                # Note: some probes have same location as frontend servers, and folium fails to display them both.
+                # Therefore, a slight delta is added. (157 km)
+                new_coords = (coordinates[0] + 1, coordinates[1] + 1)
+                folium.Marker(location=new_coords, 
+                                popup=f'{probe_name}: {str(coordinates)}', 
+                                tooltip=probe_name,
+                                icon=folium.Icon(color='darkgreen', icon='satellite-dish', prefix='fa')
+                                ).add_to(self.map)
 
     def add_frontends(self):
         # Display all frontends
-        for frontend_name, coordinates in frontend_locations.items():
-            folium.Marker(location=coordinates, 
-                            popup=f'{frontend_name}: {str(coordinates)}', 
-                            tooltip=frontend_name,
-                            icon=folium.Icon(color='blue', icon='server', prefix='fa')
-                            ).add_to(self.map)
+        if self.frontend_locations:
+            for frontend_name, coordinates in self.frontend_locations.items():
+                folium.Marker(location=coordinates, 
+                                popup=f'{frontend_name}: {str(coordinates)}', 
+                                tooltip=frontend_name,
+                                icon=folium.Icon(color='blue', icon='server', prefix='fa')
+                                ).add_to(self.map)
 
     def add_point(self, coordinates, label='', color='red'):
         folium.Marker(location=coordinates, 
@@ -47,8 +51,14 @@ class MapBuilder:
         folium.Circle(location=center, radius=1000*radius, color='blue', fill=True, fill_color='blue',
                     fill_opacity=0.03).add_to(self.map)
 
-    def save_map(self):
-        self.map.save(self.map_name)
+    def add_dashed_line(self, start, end, color='blue'):
+        folium.PolyLine([start, end], color=color, dash_array='10, 10').add_to(self.map)
+
+    def add_line(self, start, end, color='green'):
+        folium.PolyLine([start, end], color=color).add_to(self.map)
+
+    def save_map(self, path):
+        self.map.save(os.path.join(path, self.map_name))
 
 
 def make_map_with_all_frontends():
