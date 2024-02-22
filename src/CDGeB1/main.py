@@ -204,5 +204,15 @@ def main(Input_dir, Output_dir=None):
 
 
 if __name__ == '__main__':
-    Input_dir = 'Datasets' + os.sep + 'BGU-150823'
-    main(Input_dir)
+    
+    if len(sys.argv) > 1:
+        Input_dir = sys.argv[1]
+    else:
+        Input_dir = 'Datasets' + os.sep + 'BGU-150823'
+
+    if len(sys.argv) > 2:
+        Output_dir = sys.argv[2]
+    else:
+        Output_dir = None # Use default
+
+    main(Input_dir, Output_dir)
