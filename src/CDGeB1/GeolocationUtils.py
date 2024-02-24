@@ -40,7 +40,7 @@ class GeolocationUtils():
         columns = sorted(set(str(key[1]) for key in rates))
 
         # Create a Rich table
-        table = Table(title="Data Table")
+        table = Table(title="Transmission Rates (km/s) within CSP Network")
 
         # Add the columns to the table, first column for row headers
         table.add_column("", justify="right", style="cyan", no_wrap=True)

@@ -8,23 +8,17 @@ from plot_map import MapBuilder
 from rich.console import Console
 from rich.table import Table
 
-DATASET_FILE = 'full_dataset.csv'
-PROBES_DATA_FILE = 'probes.csv'
+DATASET_FILE = 'measurements.csv'
 SERVERS_DATA_FILE = 'servers.csv'
-FRONTENDS_DATA_FILE = 'frontends.csv'
-FILES_DATA_FILE = 'files.csv'
-MAPPING_DATA_FILE = 'mapping.csv'
+SOLUTION_DATA_FILE = 'solution.csv'
 
 
 def check_files_exist(Input_dir):
     if not os.path.isfile(os.path.join(Input_dir, DATASET_FILE)):
         print("Missing file", DATASET_FILE)
         return False
-    if not os.path.isfile(os.path.join(Input_dir, PROBES_DATA_FILE)):
-        print("Missing file", PROBES_DATA_FILE)
-        return False
     if not os.path.isfile(os.path.join(Input_dir, SERVERS_DATA_FILE)):
-        print("Missing file", FRONTENDS_DATA_FILE)
+        print("Missing file", SERVERS_DATA_FILE)
         return False
     return True
 
@@ -38,32 +32,61 @@ def parse_datasets(Input_dir):
             probe, frontend, file = line.split(',')[0:3]
             measurements_to_all_targets[(probe, frontend, file)] = min([float(x) for x in line.split(',')[3:]])
 
-    # Load other data
-    probe_locations = dict()
-    probes_continents = dict() # For later usage
-    with open(os.path.join(Input_dir, PROBES_DATA_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r','').replace('\n','')
-            probe, lat, long, continent = line.split(',')[0:4]
-            probe_locations[probe] = (float(lat), float(long))
-            # probes_continents[probe] = Continent(continent)
+    probes_list = set([key[0] for key in measurements_to_all_targets])
+    frontends_list = set([key[1] for key in measurements_to_all_targets])
+    files_list = set([key[2] for key in measurements_to_all_targets])
+
+    # Check for common elements
+    if len(probes_list.intersection(frontends_list)) > 0:
+        print("Probes and frontends have common elements")
+        return False
+    if len(probes_list.intersection(files_list)) > 0:
+        print("Probes and files have common elements")
+        return False
+    if len(frontends_list.intersection(files_list)) > 0:
+        print("Frontends and files have common elements")
+        return False
     
-    frontend_locations = dict()
-    frontend_continents = dict()
-    file_locations = dict()
-    file_continents = dict()
-    true_frontend_file_mapping = dict()
+    # Load servers data
+    server_locations = dict()
     with open(os.path.join(Input_dir, SERVERS_DATA_FILE), 'r') as f:
         for line in f.readlines():
             line = line.replace('\r','').replace('\n','')
-            frontend, filename, lat, long, continent = line.split(',')[0:5]
-            frontend_locations[frontend] = (float(lat), float(long))
-            frontend_continents[frontend] = Continent(continent)
-            file_locations[filename] = (float(lat), float(long))
-            file_continents[filename] = Continent(continent)
-            true_frontend_file_mapping[frontend] = filename
+            servername, lat, lon, continent = line.split(',')[0:4]
+            server_locations[servername] = (float(lat), float(lon), Continent(continent))
 
-    true_file_frontend_mapping = {v:k for k,v in true_frontend_file_mapping.items()}
+    # Check if all probes, frontends and files are in the servers list
+    if not all(probe in server_locations for probe in probes_list):
+        print("Some probes are not in the servers list")
+        return False
+    if not all(frontend in server_locations for frontend in frontends_list):
+        print("Some frontends are not in the servers list")
+        return False
+    if not all(file in server_locations for file in files_list):
+        print("Some files are not in the servers list")
+        return False
+
+    # Create dictionaries for locations and continents
+    def sortDict(d):
+        return dict(sorted(d.items(), key=lambda item: item[0]))
+
+    probe_locations = sortDict({probe:server_locations[probe][:2] for probe in probes_list})
+    probes_continents = sortDict({probe:server_locations[probe][2] for probe in probes_list})
+    frontend_locations = sortDict({frontend:server_locations[frontend][:2] for frontend in frontends_list})
+    frontend_continents = sortDict({frontend:server_locations[frontend][2] for frontend in frontends_list})
+    file_locations = sortDict({file:server_locations[file][:2] for file in files_list})
+    file_continents = sortDict({file:server_locations[file][2] for file in files_list})
+
+    # Load mapping data if exists
+    if os.path.isfile(os.path.join(Input_dir, SOLUTION_DATA_FILE)):
+        true_file_frontend_mapping = dict()
+        with open(os.path.join(Input_dir, SOLUTION_DATA_FILE), 'r') as f:
+            for line in f.readlines():
+                line = line.replace('\r','').replace('\n','')
+                file, frontend = line.split(',')[:2]
+                true_file_frontend_mapping[file] = frontend
+
+    true_frontend_file_mapping = {v:k for k,v in true_file_frontend_mapping.items()}
 
     return measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping
 
@@ -141,11 +164,11 @@ def geolocate_from_data(probe_locations, # Used for map creation
         closest_frontend = aws_geolocator.closest_frontend(estimated_location)
         
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{frontend}_estimated', probe_locations, frontend_locations)
+        map_single_target = MapBuilder(f'{filename}_estimated', probe_locations, frontend_locations)
         map_single_target.add_frontends()
-        map_single_target.add_point(estimated_location, f'estimated-location-of-{frontend}')
-        map_single_target.add_circle(estimated_location, GeolocationUtils.haversine(estimated_location, frontend_locations[frontend]))
-        map_single_target.add_dashed_line(estimated_location, frontend_locations[frontend])
+        map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
+        map_single_target.add_circle(estimated_location, GeolocationUtils.haversine(estimated_location, file_locations[filename]))
+        map_single_target.add_dashed_line(estimated_location, file_locations[filename])
         map_single_target.add_line(estimated_location, frontend_locations[closest_frontend])
         map_single_target.save_map(Output_dir)
 
@@ -208,7 +231,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         Input_dir = sys.argv[1]
     else:
-        Input_dir = 'Datasets' + os.sep + 'BGU-150823'
+        # Input_dir = 'Datasets' + os.sep + 'BGU-150823'
+        Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
 
     if len(sys.argv) > 2:
         Output_dir = sys.argv[2]
