@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+from statistics import mean, median
 from GeolocationUtils import GeolocationUtils
 from GeolocationCSP import Geolocation
 from common import Continent
@@ -30,7 +31,8 @@ def parse_datasets(Input_dir):
         for line in f.readlines():
             line = line.replace('\r','').replace('\n','')
             probe, frontend, file = line.split(',')[0:3]
-            measurements_to_all_targets[(probe, frontend, file)] = min([float(x) for x in line.split(',')[3:]])
+            # min / mean / median
+            measurements_to_all_targets[(probe, frontend, file)] = median([float(x) for x in line.split(',')[3:]])
 
     probes_list = set([key[0] for key in measurements_to_all_targets])
     frontends_list = set([key[1] for key in measurements_to_all_targets])
@@ -231,8 +233,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         Input_dir = sys.argv[1]
     else:
-        # Input_dir = 'Datasets' + os.sep + 'BGU-150823'
-        Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
+        Input_dir = 'Datasets' + os.sep + 'BGU-150823'
+        # Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
 
     if len(sys.argv) > 2:
         Output_dir = sys.argv[2]

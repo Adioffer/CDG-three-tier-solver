@@ -6,7 +6,6 @@ import zipfile
 import subprocess
 from time import sleep
 import shutil
-import sys
 
 class WebRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
