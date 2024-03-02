@@ -1,5 +1,4 @@
 numpy
 scikit-learn
-localization
 rich
 folium

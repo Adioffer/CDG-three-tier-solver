@@ -25,6 +25,13 @@ def check_files_exist(Input_dir):
 
 
 def parse_datasets(Input_dir):
+
+    def aggregateMeasurements(measurements):
+        # return min(measurements)
+        # return mean(measurements)
+        # return median(measurements)
+        return mean(sorted(measurements)[3:-3])
+
     # Load measurements from CSV
     measurements_to_all_targets = dict()
     with open(os.path.join(Input_dir, DATASET_FILE), 'r') as f:
@@ -32,7 +39,7 @@ def parse_datasets(Input_dir):
             line = line.replace('\r','').replace('\n','')
             probe, frontend, file = line.split(',')[0:3]
             # min / mean / median
-            measurements_to_all_targets[(probe, frontend, file)] = median([float(x) for x in line.split(',')[3:]])
+            measurements_to_all_targets[(probe, frontend, file)] = aggregateMeasurements([float(x) for x in line.split(',')[3:24]])
 
     probes_list = set([key[0] for key in measurements_to_all_targets])
     frontends_list = set([key[1] for key in measurements_to_all_targets])
@@ -123,8 +130,9 @@ def learn_from_data(measurements_to_all_targets, probe_locations, probes_contine
     csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
 
     # Print results
-    print("Rates within AWS (All measuremenets):", csp_general_rate)
     GeolocationUtils.pretty_print_rates(csp_rates)
+    print("Rates within AWS (All measuremenets):", csp_general_rate)
+    print()
 
     return csp_delays, csp_general_rate, csp_rates
 
@@ -233,8 +241,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         Input_dir = sys.argv[1]
     else:
-        Input_dir = 'Datasets' + os.sep + 'BGU-150823'
-        # Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
+        # Input_dir = 'Datasets' + os.sep + 'BGU-150823'
+        Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
 
     if len(sys.argv) > 2:
         Output_dir = sys.argv[2]

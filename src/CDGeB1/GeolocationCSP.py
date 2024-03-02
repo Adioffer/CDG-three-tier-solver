@@ -1,4 +1,3 @@
-import localization as lx
 import numpy as np
 from scipy.optimize import minimize
 from common import Continent # for content-aware
@@ -42,21 +41,6 @@ class Geolocation():
         """
         # Divide by 2 to get the time for single direction
         return delay * self.csp_general_rate
-
-    def _geolocate_using_Localization(self, distances):
-        """
-        Unfortunately, this doesn't work well. Prefer using the other method.
-        """
-        # Create and populate dataset for the geolocation module
-        P = lx.Project(mode='Earth1', solver='LSE')
-        [P.add_anchor(fe, self.fe_locations[fe]) for fe in distances]
-
-        t, label = P.add_target()
-        # Note: following function uses meters
-        [t.add_measure(fe, 1000*distances[fe]) for fe in distances] 
-
-        P.solve()
-        return t.loc.x, t.loc.y
 
     def _geolocate_using_scipy(self, distances):
         """
@@ -118,7 +102,6 @@ class Geolocation():
         # distances = {fe:self.delay_to_distance(delay) for fe, delay in measurements_to_target.items()}
         distances = {fe:self.delay_to_distance_continent_aware(delay, self.frontend_continents[fe], target_assumed_continent) for fe, delay in measurements_to_target.items()}
 
-        # return self._geolocate_using_Localization(distances)
         return self._geolocate_using_scipy(distances)
 
     def geolocate_target_from_distances(self, distances: dict):
@@ -129,7 +112,6 @@ class Geolocation():
         assert all(frontend in self.fe_locations \
                    for frontend in distances), "Inputs do not match (distances, fe_locations)"
 
-        # return self._geolocate_using_Localization(distances)
         return self._geolocate_using_scipy(distances)
     
     def closest_frontend(self, target: tuple[float, float]) -> tuple:
