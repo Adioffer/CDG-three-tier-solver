@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head><title>Upload Files</title></head>
+<body>
+    <h2>Upload Files</h2>
+    <form action="/uploader" method="post" enctype="multipart/form-data">
+        <label for="measurements.csv">measurements.csv:</label>
+        <input type="file" name="measurements" required><br><br>
+        <label for="servers.csv">servers.csv:</label>
+        <input type="file" name="servers" required><br><br>
+        <label for="solution.csv">solution.csv:</label>
+        <input type="file" name="solution" required><br><br>
+        <input type="submit" value="Upload">
+    </form>
+</body>
+</html>
