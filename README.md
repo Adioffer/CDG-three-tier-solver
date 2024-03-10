@@ -1,6 +1,10 @@
 # Three-tier Solver
 
-
+Run by:
+```
+cd src
+python -m CDGeB1.main
+```
 
 ## Roadmap
 Must:

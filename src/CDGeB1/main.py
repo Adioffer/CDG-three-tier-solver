@@ -200,9 +200,9 @@ def geolocate_from_data(probe_locations, # Used for map creation
     console = Console()
     console.print(table)
 
-    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
+    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])) / len(errors))
     print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
-    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
+    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])) / len(errors))
     print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
     print()
 
@@ -241,8 +241,10 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         Input_dir = sys.argv[1]
     else:
-        # Input_dir = 'Datasets' + os.sep + 'BGU-150823'
-        Input_dir = 'Datasets' + os.sep + 'Fujitsu-240216'
+        # Run from src. (python -m CDGeB1.main)
+        # Input_dir = 'CDGeB1\\Datasets\\BGU-150823'
+        # Input_dir = 'CDGeB1\\Datasets\\Fujitsu-240216'
+        Input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
 
     if len(sys.argv) > 2:
         Output_dir = sys.argv[2]
