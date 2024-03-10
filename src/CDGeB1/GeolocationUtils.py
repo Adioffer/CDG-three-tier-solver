@@ -1,5 +1,5 @@
 import numpy as np
-from common import Continent
+from CDGeB1.common import Continent
 import warnings
 
 warnings.filterwarnings("ignore", "divide by zero encountered in scalar divide", category=RuntimeWarning)

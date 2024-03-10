@@ -1,22 +1,38 @@
 from flask import Flask, request, render_template, send_from_directory
 import os
+import sys
 from werkzeug.utils import secure_filename
 import tempfile
 import subprocess
 import zipfile
+from multiprocessing import Pool, freeze_support
+
+from CDGeB1.main import main as CDG_main
 
 
-CDG_PATH = r'C:\Users\Adi\Desktop\Thesis\CDGeB-1\Solving Methods\three-tier-solver\src\CDGeB1\main.py'
 PYTHON_BIN = 'python'
-OUTPUT_DIR = os.path.join('download','output')
+ROOT_DIR = os.path.join(os.path.dirname(__file__), 'webappstorage')
+SESSIONS_DIR = os.path.join(ROOT_DIR,'sessions')
+
+os.makedirs(ROOT_DIR, exist_ok=True)
+os.makedirs(SESSIONS_DIR, exist_ok=True)
+
 
 app = Flask(__name__)
+
 
 @app.route('/')
 def upload_file():
     return render_template('upload.html')
 
-@app.route('/uploader', methods=['GET', 'POST'])
+@app.route('/download/<path:filepath>', methods=['GET'])
+def download_file(filepath):
+    if filepath.lower().endswith('.zip'):
+        return send_from_directory(ROOT_DIR, filepath, as_attachment=True)
+    else:
+        return 'Invalid file path'
+
+@app.route('/uploader', methods=['POST'])
 def upload_files():
     if request.method == 'POST':
         # Ensure all three files are present
@@ -26,54 +42,56 @@ def upload_files():
 
         if not (file1 and file2 and file3):
             return 'Missing files. Please ensure all three files are uploaded.'
-        else:
-            # Create a temporary directory
-            with tempfile.TemporaryDirectory() as working_dir:
-                input_path = os.path.join(working_dir, 'input')
-                output_path = os.path.join(working_dir, 'output')
-            
-            # Create input and output directories if they do not exist
-            os.makedirs(input_path, exist_ok=True)
-            os.makedirs(output_path, exist_ok=True)
+        
+        # Make new folder with uniquely generated name inside session directory
+        session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
 
-            app.config['UPLOAD_FOLDER'] = input_path
-            app.config['OUTPUT_FOLDER'] = OUTPUT_DIR
+        input_path = os.path.join(session_dir, 'input')
+        output_path = os.path.join(session_dir, 'output')
 
-            file1.save(os.path.join(app.config['UPLOAD_FOLDER'], 'measurements.csv'))
-            file2.save(os.path.join(app.config['UPLOAD_FOLDER'], 'servers.csv'))
-            file3.save(os.path.join(app.config['UPLOAD_FOLDER'], 'solution.csv'))
+        os.makedirs(input_path, exist_ok=True)
+        os.makedirs(output_path, exist_ok=True)
 
-            # Create a temporary file for the subprocess output
-            temp_output_path = os.path.join(output_path, "results.txt")
-            with open(temp_output_path, 'w+') as temp_output:
-                # Blocking call
-                subprocess.run([PYTHON_BIN, CDG_PATH, input_path, output_path], stdout=temp_output, stderr=subprocess.STDOUT)
-                
-            # Create a temporary file for the ZIP to be sent in response
-            zip_output_fd, zip_output_path = tempfile.mkstemp(dir=OUTPUT_DIR, suffix='.zip')
-            relative_zip_output_path = os.path.relpath(zip_output_path, start=os.getcwd())
-            os.close(zip_output_fd)  # Close the file descriptor
+        file1.save(os.path.join(input_path, 'measurements.csv'))
+        file2.save(os.path.join(input_path, 'servers.csv'))
+        file3.save(os.path.join(input_path, 'solution.csv'))
 
-            # Create a ZIP file to include the output folder
-            with zipfile.ZipFile(zip_output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, dirs, files in os.walk(output_path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, start=os.path.dirname(output_path))
-                        zipf.write(file_path, arcname=arcname)
-                for root, dirs, files in os.walk(input_path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, start=os.path.dirname(input_path))
-                        zipf.write(file_path, arcname=arcname)
+        # Create a temporary file for the CDG output
+        temp_output_path = os.path.join(output_path, "results.txt")
+        
+        # Redirect sys.stdout hack
+        original_stdout = sys.stdout
+        with open(temp_output_path, 'w') as f:
+            sys.stdout = f
+            CDG_main(input_path, output_path)
+            # Reset sys.stdout to its original value
+            sys.stdout = original_stdout
 
-            return render_template('download.html', output_file=relative_zip_output_path)
+        # Create a temporary file for the ZIP to be sent in response
+        zip_output_fd, zip_output_path = tempfile.mkstemp(dir=session_dir, prefix='CDG_', suffix='.zip')
+        relative_zip_output_path = os.path.relpath(zip_output_path, start=ROOT_DIR)
+        os.close(zip_output_fd)
+
+        # Create a ZIP file to include the output folder
+        with zipfile.ZipFile(zip_output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(output_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, start=os.path.dirname(output_path))
+                    zipf.write(file_path, arcname=arcname)
+            for root, dirs, files in os.walk(input_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, start=os.path.dirname(input_path))
+                    zipf.write(file_path, arcname=arcname)
+
+        return render_template('download.html', output_file_path=relative_zip_output_path)
     else:
         return 'File upload failed'
 
-@app.route('/download/output/<filename>')
-def download_file(filename):
-    return send_from_directory(app.config['OUTPUT_FOLDER'], filename, as_attachment=True)
+def main():
+    app.run(debug=True)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    freeze_support()  # For Windows support
+    main()    

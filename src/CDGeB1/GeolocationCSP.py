@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
-from common import Continent # for content-aware
-from GeolocationUtils import GeolocationUtils
+from CDGeB1.common import Continent # for content-aware
+from CDGeB1.GeolocationUtils import GeolocationUtils
 
 
 class Geolocation():
@@ -21,7 +21,7 @@ class Geolocation():
 
     def delay_to_distance_continent_aware(self, delay: float, src_continent: Continent, target_assumed_continent: Continent) -> float:
         """
-        Converts measured single-direction delay of data within AWS backbone to distances
+        Converts measured single-direction delay of data within CSP backbone to distances
         according to the transmission rate computed from advanced. (See front-file scatterplot)
         
         @param delay: single-direction delay in seconds
@@ -33,7 +33,7 @@ class Geolocation():
 
     def delay_to_distance(self, delay: float) -> float:
         """
-        Converts measured single-direction delay of data within AWS backbone to distances
+        Converts measured single-direction delay of data within CSP backbone to distances
         according to the transmission rate computed from advanced. (See front-file scatterplot)
         
         @param delay: single-direction delay in seconds

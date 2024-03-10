@@ -2,10 +2,10 @@ import os
 import sys
 import numpy as np
 from statistics import mean, median
-from GeolocationUtils import GeolocationUtils
-from GeolocationCSP import Geolocation
-from common import Continent
-from plot_map import MapBuilder
+from CDGeB1.GeolocationUtils import GeolocationUtils
+from CDGeB1.GeolocationCSP import Geolocation
+from CDGeB1.common import Continent
+from CDGeB1.plot_map import MapBuilder
 from rich.console import Console
 from rich.table import Table
 
@@ -131,7 +131,7 @@ def learn_from_data(measurements_to_all_targets, probe_locations, probes_contine
 
     # Print results
     GeolocationUtils.pretty_print_rates(csp_rates)
-    print("Rates within AWS (All measuremenets):", csp_general_rate)
+    print("Rates within CSP (All measuremenets):", csp_general_rate)
     print()
 
     return csp_delays, csp_general_rate, csp_rates
@@ -157,7 +157,7 @@ def geolocate_from_data(probe_locations, # Used for map creation
     map_all_targets.add_frontends()
 
     # Initialize a geolocator
-    aws_geolocator = Geolocation(frontend_locations, csp_rates=csp_rates, frontend_continents=frontend_continents)
+    csp_geolocator = Geolocation(frontend_locations, csp_rates=csp_rates, frontend_continents=frontend_continents)
 
     results = dict()
     errors = list()
@@ -170,8 +170,8 @@ def geolocate_from_data(probe_locations, # Used for map creation
         delays_from_server.pop(frontend)
 
         # Geolocation step
-        estimated_location = aws_geolocator.geolocate_target(delays_from_server)
-        closest_frontend = aws_geolocator.closest_frontend(estimated_location)
+        estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+        closest_frontend = csp_geolocator.closest_frontend(estimated_location)
         
         # Make target-specific map file
         map_single_target = MapBuilder(f'{filename}_estimated', probe_locations, frontend_locations)
