@@ -200,9 +200,9 @@ def geolocate_from_data(probe_locations, # Used for map creation
     console = Console()
     console.print(table)
 
-    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])) / len(errors))
+    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
     print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
-    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])) / len(errors))
+    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
     print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
     print()
 
