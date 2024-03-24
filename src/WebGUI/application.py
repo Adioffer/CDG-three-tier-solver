@@ -10,7 +10,6 @@ from multiprocessing import Pool, freeze_support
 from CDGeB1.main import main as CDG_main
 
 
-PYTHON_BIN = 'python'
 ROOT_DIR = os.path.join(os.path.dirname(__file__), 'webappstorage')
 SESSIONS_DIR = os.path.join(ROOT_DIR,'sessions')
 
@@ -18,21 +17,21 @@ os.makedirs(ROOT_DIR, exist_ok=True)
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 
-app = Flask(__name__)
+application = Flask(__name__)
 
 
-@app.route('/')
+@application.route('/')
 def upload_file():
     return render_template('upload.html')
 
-@app.route('/download/<path:filepath>', methods=['GET'])
+@application.route('/download/<path:filepath>', methods=['GET'])
 def download_file(filepath):
     if filepath.lower().endswith('.zip'):
         return send_from_directory(ROOT_DIR, filepath, as_attachment=True)
     else:
         return 'Invalid file path'
 
-@app.route('/uploader', methods=['POST'])
+@application.route('/uploader', methods=['POST'])
 def upload_files():
     if request.method == 'POST':
         # Ensure all three files are present
@@ -90,7 +89,7 @@ def upload_files():
         return 'File upload failed'
 
 def main():
-    app.run(debug=True)
+    application.run(debug=True)
 
 if __name__ == "__main__":
     freeze_support()  # For Windows support

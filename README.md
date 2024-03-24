@@ -4,6 +4,8 @@ Run by:
 ```
 cd src
 python -m CDGeB1.main
+
+python WeBGUI\application.py
 ```
 
 ## Roadmap
