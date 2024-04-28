@@ -1,7 +1,7 @@
 import os
 import sys
-import numpy as np
 from statistics import mean, median
+import numpy as np
 from CDGeB1.GeolocationUtils import GeolocationUtils
 from CDGeB1.GeolocationCSP import Geolocation
 from CDGeB1.common import Continent
@@ -153,14 +153,13 @@ def geolocate_from_data(probe_locations, # Used for map creation
 
     # Stages 3-5 - Geolocation
     # Create map of all geolocated targets
-    map_all_targets = MapBuilder(f'all_targets', probe_locations, frontend_locations)
+    map_all_targets = MapBuilder("all_targets", probe_locations, frontend_locations)
     map_all_targets.add_frontends()
 
     # Initialize a geolocator
     csp_geolocator = Geolocation(frontend_locations, csp_rates=csp_rates, frontend_continents=frontend_continents)
 
-    results = dict()
-    errors = list()
+    errors = []
     for filename in file_locations:
         # Geolocate current file using measurements from other frontends
         frontend = true_file_frontend_mapping[filename]
@@ -169,8 +168,27 @@ def geolocate_from_data(probe_locations, # Used for map creation
                             if filename_d == filename}
         delays_from_server.pop(frontend)
 
-        # Geolocation step
+        # Geolocation
         estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+        
+        # Second-time geolocation - distance
+        # tmp_frontends = list(delays_from_server.keys()) # Workaround
+        # for frontend_name in tmp_frontends:
+        #     if GeolocationUtils.haversine(frontend_locations[frontend_name], estimated_location) > 3000:
+        #         delays_from_server.pop(frontend_name)
+        # if len(delays_from_server) < 3:
+        #     print(f"Skipping double-geolocation for {filename} due to lack of measurements")
+        # else:
+        #     estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+
+        # Second-time geolocation - k-nearest
+        # tmp_frontends = list(delays_from_server.keys()) # Workaround
+        # tmp_frontends.sort(key=lambda x: GeolocationUtils.haversine(frontend_locations[x], estimated_location))
+        # k = 6
+        # for frontend_name in tmp_frontends[k:]:
+        #     delays_from_server.pop(frontend_name)
+        # estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+
         closest_frontend = csp_geolocator.closest_frontend(estimated_location)
         
         # Make target-specific map file
@@ -242,9 +260,9 @@ if __name__ == '__main__':
         Input_dir = sys.argv[1]
     else:
         # Run from src. (python -m CDGeB1.main)
-        # Input_dir = 'CDGeB1\\Datasets\\BGU-150823'
+        Input_dir = 'CDGeB1\\Datasets\\BGU-150823'
         # Input_dir = 'CDGeB1\\Datasets\\Fujitsu-240216'
-        Input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
+        # Input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
 
     if len(sys.argv) > 2:
         Output_dir = sys.argv[2]
