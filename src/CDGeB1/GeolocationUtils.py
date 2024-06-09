@@ -114,10 +114,54 @@ class GeolocationUtils():
         
         return closest_file_for_frontend
 
+    def compute_csp_delays_intra_dc_poc(self, measurements_to_all_targets):
+        intra_dc = {"cdgeb-server-01": 0.013363,
+            "cdgeb-server-02": 0.011441,
+            "cdgeb-server-03": 0.018753,
+            "cdgeb-server-04": 0.019172,
+            "cdgeb-server-05": 0.012989,
+            "cdgeb-server-06": 0.011617,
+            "cdgeb-server-07": 0.012338,
+            "cdgeb-server-08": 0.012499,
+            "cdgeb-server-09": 0.014998,
+            "cdgeb-server-10": 0.01144,
+            "cdgeb-server-11": 0.011053,
+            "cdgeb-server-12": 0.012879,
+            "cdgeb-server-13": 0.013707,
+            "cdgeb-server-14": 0.012099,
+            "cdgeb-server-15": 0.013234,
+            "cdgeb-server-16": 0.011779,
+            "cdgeb-server-17": 0.013305,
+        }
+        
+        rtts_within_csp = dict()
+        for frontend in self.frontend_locations:
+            closest_file = self.closest_file_for_frontend[frontend]
+            closest_probe = self.closets_probe_to_frontends[frontend]
+            
+            for filename in self.file_locations:
+                rtts_within_csp[(frontend, filename)] = \
+                    measurements_to_all_targets[(closest_probe, frontend, filename)] - \
+                    measurements_to_all_targets[(closest_probe, frontend, closest_file)] \
+                    + intra_dc[frontend]
+                
+                if rtts_within_csp[(frontend, filename)] < 0:
+                    print("ERROR: Negative RTT!")
+                    # rtts_within_csp[(frontend, filename)] = 0 # Avoid negative values
+        
+                if measurements_to_all_targets[(closest_probe, frontend, filename)] - \
+                    measurements_to_all_targets[(closest_probe, frontend, closest_file)] < 0:
+                    print("ERROR: Negative RTT for RTT2-RTT1!")
+
+        return rtts_within_csp
+
     def compute_csp_delays(self, measurements_to_all_targets):
         """
         Compute the round-trip times of the second hop (front-end to file)
         """
+
+        # self.compute_csp_delays_intra_dc_poc(measurements_to_all_targets)
+
         rtts_within_csp = dict()
         for frontend in self.frontend_locations:
             closest_file = self.closest_file_for_frontend[frontend]
@@ -127,7 +171,7 @@ class GeolocationUtils():
                 rtts_within_csp[(frontend, filename)] = \
                     measurements_to_all_targets[(closest_probe, frontend, filename)] - \
                     measurements_to_all_targets[(closest_probe, frontend, closest_file)]
-        
+
         return rtts_within_csp
 
     def _evaluate_rates_inner(self, continent_a=None, continent_b=None):

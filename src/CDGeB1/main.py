@@ -2,12 +2,12 @@ import os
 import sys
 from statistics import mean, median
 import numpy as np
+from rich.console import Console
+from rich.table import Table
 from CDGeB1.GeolocationUtils import GeolocationUtils
 from CDGeB1.GeolocationCSP import Geolocation
 from CDGeB1.common import Continent
 from CDGeB1.plot_map import MapBuilder
-from rich.console import Console
-from rich.table import Table
 
 DATASET_FILE = 'measurements.csv'
 SERVERS_DATA_FILE = 'servers.csv'

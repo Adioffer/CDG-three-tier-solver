@@ -1,13 +1,12 @@
-from flask import Flask, request, render_template, send_from_directory
 import os
 import sys
-from werkzeug.utils import secure_filename
 import tempfile
-import subprocess
 import zipfile
 import json
 import datetime
-from multiprocessing import Pool, freeze_support
+from multiprocessing import freeze_support
+from werkzeug.utils import secure_filename
+from flask import Flask, request, render_template, send_from_directory
 
 from CDGeB1.main import main as CDG_main
 
@@ -21,7 +20,7 @@ os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 application = Flask(__name__)
 
-
+# Web GUI
 @application.route('/')
 def upload_file():
     return render_template('upload.html')
@@ -75,12 +74,12 @@ def upload_files():
 
         # Create a ZIP file to include the output folder
         with zipfile.ZipFile(zip_output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(output_path):
+            for root, _, files in os.walk(output_path):
                 for file in files:
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, start=os.path.dirname(output_path))
                     zipf.write(file_path, arcname=arcname)
-            for root, dirs, files in os.walk(input_path):
+            for root, _, files in os.walk(input_path):
                 for file in files:
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, start=os.path.dirname(input_path))
@@ -88,10 +87,11 @@ def upload_files():
 
         return render_template('download.html', output_file_path=relative_zip_output_path)
     else:
-        return 'File upload failed'
+        return 'File request'
 
+# REST API
 @application.route('/rest', methods=['POST'])
-def rest_api():
+def rest_api() -> str:
     if request.method == 'POST':
         # Ensure all three files are present
         file1 = request.files.get('measurements')
@@ -130,13 +130,13 @@ def rest_api():
         outputAsDict['Meta']['date_utc'] = datetime.datetime.now(datetime.UTC).isoformat()
 
         outputAsDict['Assets'] = {}
-        for root, dirs, files in os.walk(output_path):
+        for root, _, files in os.walk(output_path):
             for file in files:
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, start=os.path.dirname(SESSIONS_DIR))
                 print("file", file, "file_path", file_path, "arcname", arcname)
                 outputAsDict['Assets'][file] = arcname.replace('\\', '/').replace('sessions', '/GetFile')
-        for root, dirs, files in os.walk(input_path):
+        for root, _, files in os.walk(input_path):
             for file in files:
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, start=os.path.dirname(SESSIONS_DIR))
@@ -144,17 +144,26 @@ def rest_api():
 
         return json.dumps(outputAsDict, indent=4)
     else:
-        return 'File upload failed'
+        return 'Invalid request'
 
-@application.route('/GetFile/<path:filepath>', methods=['GET'])
+@application.route('/GetFile', methods=['GET'])
 def download_file(filepath):
-    if filepath.lower().endswith(('.html', '.txt', '.csv')):
+    session = request.args.get('sessionid', default=None)
+    filename = request.args.get('file', default=None)
+
+    if filename and session:
+        filename = secure_filename(filename)
+        session = secure_filename(session)
+    else:
+        return 'Invalid request'
+
+    if filename.lower().endswith(('.html', '.txt', '.csv')):
         return send_from_directory(SESSIONS_DIR, filepath, as_attachment=True)
     else:
         return 'Invalid file path'
 
 
-def main():
+def main() -> None:
     application.run(debug=True)
 
 if __name__ == "__main__":
