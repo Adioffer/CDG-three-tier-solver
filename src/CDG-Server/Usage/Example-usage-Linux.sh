@@ -17,4 +17,4 @@ curl -X POST -F "measurements=@$measurements" -F "servers=@$servers" -F "solutio
 
 # Second GET request
 jq_query=".Assets.\"$REQUESTED_FILE_NAME\""
-curl -X GET https://cdgeo.net/$(cat output/output.json | jq -r $jq_query) --output "output/$REQUESTED_FILE_NAME"
+curl -X GET $(cat output/output.json | jq -r $jq_query) --output "output/$REQUESTED_FILE_NAME"

@@ -19,4 +19,4 @@ cmd /c curl $uri -X POST -H "Content-Type: multipart/form-data" -F "measurements
 # Second GET request
 $outputJson = Get-Content -Path "output/output.json" | ConvertFrom-Json
 $fileUrl = $outputJson.Assets.$REQUESTED_FILE_NAME
-Invoke-RestMethod -Method Get -Uri "https://cdgeo.net/$fileUrl" -OutFile "output/$REQUESTED_FILE_NAME"
+Invoke-RestMethod -Method Get -Uri "$fileUrl" -OutFile "output/$REQUESTED_FILE_NAME"
