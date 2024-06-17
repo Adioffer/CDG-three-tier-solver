@@ -87,7 +87,7 @@ def upload_files():
 
         return render_template('download.html', output_file_path=relative_zip_output_path)
     else:
-        return 'File request'
+        return 'Invalid request'
 
 # REST API
 @application.route('/rest', methods=['POST'])
@@ -146,19 +146,12 @@ def rest_api() -> str:
     else:
         return 'Invalid request'
 
-@application.route('/GetFile', methods=['GET'])
+@application.route('/GetFile/<path:filepath>', methods=['GET'])
 def download_file(filepath):
-    session = request.args.get('sessionid', default=None)
-    filename = request.args.get('file', default=None)
-
-    if filename and session:
-        filename = secure_filename(filename)
-        session = secure_filename(session)
-    else:
-        return 'Invalid request'
-
-    if filename.lower().endswith(('.html', '.txt', '.csv')):
+    if filepath.lower().endswith('.csv'):
         return send_from_directory(SESSIONS_DIR, filepath, as_attachment=True)
+    elif filepath.lower().endswith(('.html', '.txt')):
+        return send_from_directory(SESSIONS_DIR, filepath, as_attachment=False)
     else:
         return 'Invalid file path'
 
