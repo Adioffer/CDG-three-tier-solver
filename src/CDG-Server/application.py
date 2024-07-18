@@ -10,20 +10,20 @@ from flask import Flask, request, render_template, send_from_directory
 
 from CDGeB1.main import main as CDG_main
 
-
 ROOT_DIR = os.path.join(os.path.dirname(__file__), 'webappstorage')
-SESSIONS_DIR = os.path.join(ROOT_DIR,'sessions')
+SESSIONS_DIR = os.path.join(ROOT_DIR, 'sessions')
 
 os.makedirs(ROOT_DIR, exist_ok=True)
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
-
 application = Flask(__name__)
+
 
 # Web GUI
 @application.route('/')
 def upload_file():
     return render_template('upload.html')
+
 
 @application.route('/download/<path:filepath>', methods=['GET'])
 def download_zip(filepath):
@@ -31,6 +31,7 @@ def download_zip(filepath):
         return send_from_directory(ROOT_DIR, filepath, as_attachment=True)
     else:
         return 'Invalid file path'
+
 
 @application.route('/uploader', methods=['POST'])
 def upload_files():
@@ -40,9 +41,13 @@ def upload_files():
         file2 = request.files.get('servers')
         file3 = request.files.get('solution')
 
-        if not (file1 and file2 and file3):
+        file4 = request.files.get('measurements2')
+        file5 = request.files.get('servers2')
+        file6 = request.files.get('solution2')
+
+        if not (file1 and file2 and file3 and file4 and file5 and file6):
             return 'Missing files. Please ensure all three files are uploaded.'
-        
+
         # Make new folder with uniquely generated name inside session directory
         session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
 
@@ -55,10 +60,12 @@ def upload_files():
         file1.save(os.path.join(input_path, 'measurements.csv'))
         file2.save(os.path.join(input_path, 'servers.csv'))
         file3.save(os.path.join(input_path, 'solution.csv'))
-
+        file4.save(os.path.join(input_path, 'measurements2.csv'))
+        file5.save(os.path.join(input_path, 'servers2.csv'))
+        file6.save(os.path.join(input_path, 'solution2.csv'))
         # Create a temporary file for the CDG output
         temp_output_path = os.path.join(output_path, "results.txt")
-        
+
         # Redirect sys.stdout hack
         original_stdout = sys.stdout
         with open(temp_output_path, 'w') as f:
@@ -89,6 +96,7 @@ def upload_files():
     else:
         return 'Invalid request'
 
+
 # REST API
 @application.route('/rest', methods=['POST'])
 def rest_api() -> str:
@@ -97,14 +105,18 @@ def rest_api() -> str:
     file2 = request.files.get('servers')
     file3 = request.files.get('solution')
 
-    if not (file1 and file2 and file3):
+    file4 = request.files.get('measurements2')
+    file5 = request.files.get('servers2')
+    file6 = request.files.get('solution2')
+
+    if not (file1 and file2 and file3 and file4 and file5 and file6):
         return 'Missing files. Please ensure all three files are uploaded.'
-    
+
     domain_name = request.headers.get('Host')
     if domain_name is None:
         return 'Invalid request. Host header is expected.'
     print(domain_name)
-    
+
     # Make new folder with uniquely generated name inside session directory
     session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
 
@@ -117,10 +129,13 @@ def rest_api() -> str:
     file1.save(os.path.join(input_path, 'measurements.csv'))
     file2.save(os.path.join(input_path, 'servers.csv'))
     file3.save(os.path.join(input_path, 'solution.csv'))
+    file4.save(os.path.join(input_path, 'measurements2.csv'))
+    file5.save(os.path.join(input_path, 'servers2.csv'))
+    file6.save(os.path.join(input_path, 'solution2.csv'))
 
     # Create a temporary file for the CDG output
     temp_output_path = os.path.join(output_path, "results.txt")
-    
+
     # Redirect sys.stdout hack
     original_stdout = sys.stdout
     with open(temp_output_path, 'w') as f:
@@ -139,14 +154,17 @@ def rest_api() -> str:
             file_path = os.path.join(root, file)
             arcname = os.path.relpath(file_path, start=os.path.dirname(SESSIONS_DIR))
             print("file", file, "file_path", file_path, "arcname", arcname)
-            outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions', '/GetFile')
+            outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions',
+                                                                                                        '/GetFile')
     for root, _, files in os.walk(input_path):
         for file in files:
             file_path = os.path.join(root, file)
             arcname = os.path.relpath(file_path, start=os.path.dirname(SESSIONS_DIR))
-            outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions', '/GetFile')
+            outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions',
+                                                                                                        '/GetFile')
 
     return json.dumps(outputAsDict, indent=4)
+
 
 @application.route('/GetFile/<path:filepath>', methods=['GET'])
 def download_file(filepath):
@@ -161,6 +179,7 @@ def download_file(filepath):
 def main() -> None:
     application.run(debug=True)
 
+
 if __name__ == "__main__":
     freeze_support()  # For Windows support
-    main()    
+    main()
