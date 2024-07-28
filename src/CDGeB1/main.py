@@ -391,7 +391,7 @@ def geolocation_main(input_dir, output_dir):
                                                                                            frontend_locations_3party,
                                                                                            filenames)
 
-    geolocate_from_data(cdgeb_utils, csp_delays, csp_rates, output_dir, datacenter_frontend_mapping,filenames,
+    geolocate_from_data(cdgeb_utils, csp_delays, csp_rates, output_dir, datacenter_frontend_mapping, filenames,
                         file_locations, file_datacenter_mapping)
 
     # TODO: csp_rates should actually be recalculated in the geolocate_from_data function
