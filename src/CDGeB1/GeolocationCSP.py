@@ -5,7 +5,7 @@ from CDGeB1.GeolocationUtils import GeolocationUtils
 
 
 class Geolocation():
-    def __init__(self, fe_locations: dict,
+    def __init__(self, fe_locations: dict, dc_locations,
                  csp_general_rate: float=None, csp_rates: dict=None, frontend_continents: dict =None):
         """
         @param fe_locations: dict of front-end names and their (lat, long) coordinates.
@@ -15,6 +15,7 @@ class Geolocation():
         """
         
         self.fe_locations = fe_locations
+        self.dc_locations = dc_locations
         self.frontend_continents = frontend_continents
         self.csp_general_rate = csp_general_rate
         self.csp_rates = csp_rates
@@ -73,7 +74,7 @@ class Geolocation():
             return result.x
         
         distances_from_fes = list(distances.values())
-        fe_positions = [self.fe_locations[fe] for fe in distances]
+        fe_positions = [self.fe_locations[fe][:2] for fe in distances]
 
         target = multilateration(np.array(fe_positions), np.array(distances_from_fes))
         return normalize_coordinates(target)
@@ -120,7 +121,16 @@ class Geolocation():
         
         @param target: Target's coordinates.
         """
-        closest_fe = min(self.fe_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1]))
+        closest_fe = min(self.fe_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1][:2]))
 
         return closest_fe[0]
-    
+
+    def closest_datacenter(self, target: tuple[float, float]) -> tuple:
+        """
+        Return the closest data-center to the given coordinates.
+
+        @param target: Target's coordinates.
+        """
+        closest_dc = min(self.dc_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1][:2]))
+
+        return closest_dc[0]
