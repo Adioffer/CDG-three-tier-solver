@@ -44,7 +44,7 @@ def upload_files():
         file5 = request.files.get('datacenters')
         file6 = request.files.get('solution')
 
-        if not (file1 and file2 and file3 and file4 and file5 and file6):
+        if not (file1 and file2 and file3 and file4 and file5):
             return 'Missing files. Please ensure all three files are uploaded.'
 
         # Make new folder with uniquely generated name inside session directory
