@@ -58,18 +58,19 @@ class GeolocationUtils():
         console.print(table)
 
     def __init__(self,
-                 true_file_frontend_mapping,
+                 file_frontend_mapping,
                  probe_locations,
                  frontend_locations,
                  frontend_continents,
                  file_locations,
+                 datacenter_locations,
                  # Optionals:
-                 closets_probe_to_frontends = None,
-                 closest_file_for_frontend = None,
-                 csp_delays = None,
-                 csp_distances = None
+                 closets_probe_to_frontends=None,
+                 closest_file_for_frontend=None,
+                 csp_delays=None,
+                 csp_distances=None
                  ):
-        self.true_file_frontend_mapping = true_file_frontend_mapping
+        self.file_frontend_mapping = file_frontend_mapping
         self.probe_locations = probe_locations
         self.frontend_locations = frontend_locations
         self.frontend_continents = frontend_continents
@@ -78,12 +79,13 @@ class GeolocationUtils():
         self.closest_file_for_frontend = closest_file_for_frontend
         self.csp_delays = csp_delays
         self.csp_distances = csp_distances
+        self.datacenter_locations = datacenter_locations
 
     def build_distance_map(self):
         distances = dict()
         for frontend, frontend_location in self.frontend_locations.items():
             for filename, file_location in self.file_locations.items():
-                distances[(frontend, filename)] = self.haversine(frontend_location, file_location)
+                distances[(frontend, filename)] = self.haversine(frontend_location[:2], file_location[:2])
         return distances
 
     def determine_closest_probes(self):
@@ -93,8 +95,8 @@ class GeolocationUtils():
         closest_probes = dict()
         for frontend in self.frontend_locations:
             closest_probes[frontend] = min(self.probe_locations,
-                                           key=lambda probe: self.haversine(self.frontend_locations[frontend],
-                                                                            self.probe_locations[probe]))
+                                           key=lambda probe: self.haversine(self.frontend_locations[frontend][:2],
+                                                                            self.probe_locations[probe][:2]))
 
         return closest_probes
 
@@ -181,18 +183,16 @@ class GeolocationUtils():
 
         return rtts_within_csp
 
-
-
-    def compute_csp_delays_test(self, measurements_to_all_targets, measurements_to_all_targets2, frontend_locations2, filenames):
+    def compute_csp_delays_test(self, measurements_1party, measurements_3party, frontend_3party, filenames):
         rtts_within_csp = dict()
-        for frontend in frontend_locations2:
+        for frontend in frontend_3party:
             closest_file = self.closest_file_for_frontend[frontend]
             closest_probe = self.closets_probe_to_frontends[frontend]
 
             for filename in filenames:
                 rtts_within_csp[(frontend, filename)] = \
-                    measurements_to_all_targets2[(closest_probe, frontend, filename)] - \
-                    measurements_to_all_targets[(closest_probe, frontend, closest_file)]
+                    measurements_3party[(closest_probe, frontend, filename)] - \
+                    measurements_1party[(closest_probe, frontend, closest_file)]
 
         return rtts_within_csp
 
@@ -210,7 +210,7 @@ class GeolocationUtils():
                 # Filter the relevant measurements
                 if continent_a and continent_b:
                     if continent_a != self.frontend_continents[frontend] or \
-                            continent_b != self.frontend_continents[self.true_file_frontend_mapping[filename]]:
+                            continent_b != self.datacenter_locations[self.file_frontend_mapping[filename]][2]:
                         continue
 
                 distance = self.csp_distances[(frontend, filename)]
@@ -241,5 +241,3 @@ class GeolocationUtils():
                 rates[(continent_a, continent_b)] = rate
 
         return rates
-
-

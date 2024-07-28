@@ -1,5 +1,6 @@
 import os
 import sys
+import csv
 from statistics import mean, median
 import numpy as np
 from rich.console import Console
@@ -10,12 +11,12 @@ from CDGeB1.common import Continent
 from CDGeB1.plot_map import MapBuilder
 import pickle
 
-DATASET_FILE = 'measurements.csv'
-SERVERS_DATA_FILE = 'servers.csv'
+DATASET_FILE = 'measurements-1party.csv'
+SERVERS_DATA_FILE = 'servers-1party.csv'
+DATACENTERS_FILE = 'datacenters.csv'
+DATASET_FILE2 = 'measurements-3party.csv'
+SERVERS_DATA_FILE2 = 'servers-3party.csv'
 SOLUTION_DATA_FILE = 'solution.csv'
-DATASET_FILE2 = 'measurements2.csv'
-SERVERS_DATA_FILE2 = 'servers2.csv'
-SOLUTION_DATA_FILE2 = 'solution2.csv'
 
 
 def check_files_exist(input_dir):
@@ -26,57 +27,85 @@ def check_files_exist(input_dir):
     if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE)):
         print("Missing file", SERVERS_DATA_FILE)
         return False
+    if not os.path.isfile(os.path.join(input_dir, DATACENTERS_FILE)):
+        return False
+    if not os.path.isfile(os.path.join(input_dir, DATASET_FILE2)):
+        return False
+    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE2)):
+        return False
     return True
 
 
-def parse_datasets_train(input_dir):
-    def aggregateMeasurements(measurements):
-        # return min(measurements)
-        # return mean(measurements)
-        # return median(measurements)
-        return mean(sorted(measurements)[3:-3])
+def aggregateMeasurements(measurements):
+    # return min(measurements)
+    # return mean(measurements)
+    # return median(measurements)
+    return mean(sorted(measurements)[3:-3])
 
+
+def parse_datasets_1party(input_dir):
     # Load measurements from CSV
-    measurements_to_all_targets = dict()
+    measurements_1party = dict()
     with open(os.path.join(input_dir, DATASET_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r', '').replace('\n', '')
-            probe, frontend, file = line.split(',')[0:3]
-            # min / mean / median
-            measurements_to_all_targets[(probe, frontend, file)] = aggregateMeasurements(
-                [float(x) for x in line.split(',')[3:24]])
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            if len(row) < 23:
+                print(f"Skipping incomplete row: {row}")
+                continue
+            probe, frontend, file = row[:3]
+            measurements = [float(x) for x in row[3:24]]
+            measurements_1party[(probe, frontend, file)] = aggregateMeasurements(measurements)
 
-    probes_list = set([key[0] for key in measurements_to_all_targets])
-    frontends_list = set([key[1] for key in measurements_to_all_targets])
-    files_list = set([key[2] for key in measurements_to_all_targets])
+    probes_set = set([key[0] for key in measurements_1party])
+    frontends_set = set([key[1] for key in measurements_1party])
+    files_set = set([key[2] for key in measurements_1party])
 
     # Check for common elements
-    if len(probes_list.intersection(frontends_list)) > 0:
+    if len(probes_set.intersection(frontends_set)) > 0:
         print("Probes and frontends have common elements")
         return False
-    if len(probes_list.intersection(files_list)) > 0:
+    if len(probes_set.intersection(files_set)) > 0:
         print("Probes and files have common elements")
         return False
-    if len(frontends_list.intersection(files_list)) > 0:
+    if len(frontends_set.intersection(files_set)) > 0:
         print("Frontends and files have common elements")
         return False
 
     # Load servers data
     server_locations = dict()
+    file_datacenter_mapping = dict()
+    server_datacenter_mapping = dict()
     with open(os.path.join(input_dir, SERVERS_DATA_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r', '').replace('\n', '')
-            servername, lat, lon, continent = line.split(',')[0:4]
-            server_locations[servername] = (float(lat), float(lon), Continent(continent))
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            if len(row) < 4:
+                name, datacenter = row[:2]
+                if name in files_set:
+                    file_datacenter_mapping[name] = datacenter
+                elif name in frontends_set:
+                    server_datacenter_mapping[name] = datacenter
+            else:
+                servername, lat, lon, continent = row[:4]
+                server_locations[servername] = (float(lat), float(lon), Continent(continent))
+
+    datacenter_location = dict()
+    with open(os.path.join(input_dir, DATACENTERS_FILE), 'r') as f:
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            if len(row) < 4:
+                print(f"Skipping incomplete row: {row}")
+                continue
+            name, lat, lon, continent = row[:4]
+            datacenter_location[name] = (float(lat), float(lon), continent)
 
     # Check if all probes, frontends and files are in the servers list
-    if not all(probe in server_locations for probe in probes_list):
+    if not all(probe in server_locations for probe in probes_set):
         print("Some probes are not in the servers list")
         return False
-    if not all(frontend in server_locations for frontend in frontends_list):
+    if not all(frontend in server_datacenter_mapping for frontend in frontends_set):
         print("Some frontends are not in the servers list")
         return False
-    if not all(file in server_locations for file in files_list):
+    if not all(file in file_datacenter_mapping for file in files_set):
         print("Some files are not in the servers list")
         return False
 
@@ -84,107 +113,122 @@ def parse_datasets_train(input_dir):
     def sortDict(d):
         return dict(sorted(d.items(), key=lambda item: item[0]))
 
-    probe_locations = sortDict({probe: server_locations[probe][:2] for probe in probes_list})
-    probes_continents = sortDict({probe: server_locations[probe][2] for probe in probes_list})
-    frontend_locations = sortDict({frontend: server_locations[frontend][:2] for frontend in frontends_list})
-    frontend_continents = sortDict({frontend: server_locations[frontend][2] for frontend in frontends_list})
-    file_locations = sortDict({file: server_locations[file][:2] for file in files_list})
-    file_continents = sortDict({file: server_locations[file][2] for file in files_list})
+    def find_frontend_location(frontend):
+        datacenter = server_datacenter_mapping[frontend]
+        return datacenter_location[datacenter]
 
-    # Load mapping data if exists
-    if os.path.isfile(os.path.join(input_dir, SOLUTION_DATA_FILE)):
-        true_file_frontend_mapping = dict()
-        with open(os.path.join(input_dir, SOLUTION_DATA_FILE), 'r') as f:
-            for line in f.readlines():
-                line = line.replace('\r', '').replace('\n', '')
-                file, frontend = line.split(',')[:2]
-                true_file_frontend_mapping[file] = frontend
+    def find_file_location(file):
+        datacenter = file_datacenter_mapping[file]
+        return datacenter_location[datacenter]
 
-    true_frontend_file_mapping = {v: k for k, v in true_file_frontend_mapping.items()}
+    probe_locations = sortDict({probe: server_locations[probe][:2] for probe in probes_set})
+    frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
+    frontend_continents = sortDict({frontend: find_frontend_location(frontend)[2] for frontend in frontends_set})
+    file_locations = sortDict({file: find_file_location(file) for file in files_set})
 
-    return measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping
-
-
-def parse_datasets_test(input_dir):
-    def aggregateMeasurements(measurements):
-        # return min(measurements)
-        # return mean(measurements)
-        # return median(measurements)
-        return mean(sorted(measurements)[3:-3])
-
-    # Load measurements from CSV
-    measurements_to_all_targets = dict()
-    with open(os.path.join(input_dir, DATASET_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r', '').replace('\n', '')
-            probe, frontend, file = line.split(',')[0:3]
-            # min / mean / median
-            measurements_to_all_targets[(probe, frontend, file)] = aggregateMeasurements(
-                [float(x) for x in line.split(',')[3:24]])
-
-    probes_list = set([key[0] for key in measurements_to_all_targets])
-    frontends_list = set([key[1] for key in measurements_to_all_targets])
-    files_list = set([key[2] for key in measurements_to_all_targets])
-    # Load servers data
-    server_locations = dict()
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE), 'r') as f:
-        for line in f.readlines():
-            line = line.replace('\r', '').replace('\n', '')
-            servername, lat, lon, continent = line.split(',')[0:4]
-            server_locations[servername] = (float(lat), float(lon), Continent(continent))
-
-    # Check if all probes, frontends and files are in the servers list
-    if not all(probe in server_locations for probe in probes_list):
-        print("Some probes are not in the servers list")
-        return False
-    if not all(frontend in server_locations for frontend in frontends_list):
-        print("Some frontends are not in the servers list")
-        return False
-    if not all(file in server_locations for file in files_list):
-        print("Some files are not in the servers list")
-        return False
-
-    # Create dictionaries for locations and continents
-    def sortDict(d):
-        return dict(sorted(d.items(), key=lambda item: item[0]))
-
-    probe_locations = sortDict({probe: server_locations[probe][:2] for probe in probes_list})
-    probes_continents = sortDict({probe: server_locations[probe][2] for probe in probes_list})
-    frontend_locations = sortDict({frontend: server_locations[frontend][:2] for frontend in frontends_list})
-    frontend_continents = sortDict({frontend: server_locations[frontend][2] for frontend in frontends_list})
-
-    return measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, files_list
-
-
-def learn_from_data(measurements_to_all_targets, probe_locations, frontend_locations,
-                    frontend_continents, file_locations,
-                    true_file_frontend_mapping, measurements_to_all_targets2,
-                    frontend_locations2, filenames):
-    # Stage 1 - Compute delays within CSP
     cdgeb_geolocation_utils = GeolocationUtils(
-        true_file_frontend_mapping=true_file_frontend_mapping,
+        file_frontend_mapping=file_datacenter_mapping,
         probe_locations=probe_locations,
         frontend_locations=frontend_locations,
         frontend_continents=frontend_continents,
         file_locations=file_locations,
+        datacenter_locations=datacenter_location
     )
+
+    return measurements_1party, probe_locations, frontend_locations, frontend_continents, \
+           cdgeb_geolocation_utils
+
+
+def parse_datasets_3party(input_dir, datacenter_location):
+    # Load measurements from CSV
+    measurements_3party = dict()
+    with open(os.path.join(input_dir, DATASET_FILE), 'r') as f:
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            if len(row) < 23:
+                print(f"Skipping incomplete row: {row}")
+                continue
+            probe, frontend, file = row[:3]
+            measurements = [float(x) for x in row[3:24]]
+            measurements_3party[(probe, frontend, file)] = aggregateMeasurements(measurements)
+
+    probes_set = set([key[0] for key in measurements_3party])
+    frontends_set = set([key[1] for key in measurements_3party])
+    files_set = set([key[2] for key in measurements_3party])
+    # Load servers data
+    server_locations = dict()
+    server_datacenter_mapping = dict()
+    with open(os.path.join(input_dir, SERVERS_DATA_FILE2), 'r') as f:
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            if len(row) < 4:
+                name, datacenter = row[:2]
+                if name in frontends_set:
+                    server_datacenter_mapping[name] = datacenter
+            else:
+                servername, lat, lon, continent = row[:4]
+                server_locations[servername] = (float(lat), float(lon), Continent(continent))
+
+    # Check if all probes, frontends and files are in the servers list
+    if not all(probe in server_locations for probe in probes_set):
+        print("Some probes are not in the servers list")
+        return False
+    if not all(frontend in frontends_set for frontend in frontends_set):
+        print("Some frontends are not in the servers list")
+        return False
+    if not all(file in files_set for file in files_set):
+        print("Some files are not in the servers list")
+        return False
+
+    # Create dictionaries for locations and continents
+    def sortDict(d):
+        return dict(sorted(d.items(), key=lambda item: item[0]))
+
+    def find_frontend_location(frontend):
+        datacenter = server_datacenter_mapping[frontend]
+        return datacenter_location[datacenter]
+
+    frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
+
+    file_locations = None
+    file_datacenter_mapping = None
+    if os.path.isfile(os.path.join(input_dir, SOLUTION_DATA_FILE)):
+        file_datacenter_mapping = dict()
+        with open(os.path.join(input_dir, SOLUTION_DATA_FILE), 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 2:
+                    file, datacenter = row[:2]
+                    file_datacenter_mapping[file] = datacenter
+        file_locations = {file: datacenter_location[datacenter] for file, datacenter in file_datacenter_mapping.items()}
+
+    return measurements_3party, frontend_locations, files_set, file_locations, file_datacenter_mapping
+
+
+def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3party, frontend_locations_3party,
+                    filenames_3party):
+    # Stage 1 - Compute delays within CSP
+
     distance_map = cdgeb_geolocation_utils.build_distance_map()
     cdgeb_geolocation_utils.csp_distances = distance_map
 
     closets_probe_to_frontends = cdgeb_geolocation_utils.determine_closest_probes()
     cdgeb_geolocation_utils.closets_probe_to_frontends = closets_probe_to_frontends
 
-    closest_file_for_frontend = cdgeb_geolocation_utils.determine_closest_files(measurements_to_all_targets)
+    closest_file_for_frontend = cdgeb_geolocation_utils.determine_closest_files(measurements_1party)
     cdgeb_geolocation_utils.closest_file_for_frontend = closest_file_for_frontend
 
-    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_to_all_targets)
+    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_1party)
 
-    # mission 3:
-    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_to_all_targets, measurements_to_all_targets2, frontend_locations2, filenames)
+    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_1party, measurements_3party,
+                                                                      frontend_locations_3party, filenames_3party)
 
     csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
     cdgeb_geolocation_utils.csp_delays = csp_delays
 
+    datacenter_frontend_mapping = {datacenter: frontend for datacenter, datacenter_loc in
+                                   cdgeb_geolocation_utils.datacenter_locations.items() for frontend, frontend_loc in
+                                   cdgeb_geolocation_utils.frontend_locations.items() if datacenter_loc == frontend_loc}
 
     # Save results
     # TODO
@@ -193,14 +237,12 @@ def learn_from_data(measurements_to_all_targets, probe_locations, frontend_locat
     csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
     csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
 
-
     # Print results
     GeolocationUtils.pretty_print_rates(csp_rates)
     print("Rates within CSP (All measuremenets):", csp_general_rate)
     print()
 
-
-    return csp_delays, csp_general_rate, csp_rates
+    return csp_delays, csp_general_rate, csp_rates, datacenter_frontend_mapping
 
 
 def are_tables_equal(table1, table2):
@@ -221,38 +263,46 @@ def are_tables_equal(table1, table2):
     return True
 
 
-def geolocate_from_data(probe_locations,  # Used for map creation
-                        frontend_locations, frontend_continents,  # used for geolocation
-                        file_locations, true_frontend_file_mapping, true_file_frontend_mapping,
+def geolocate_from_data(cdgeb_utils,  # used for geolocation
                         # Used for building geolocation setup
                         csp_delays, csp_rates,  # used for geolocation
-                        Output_dir
+                        Output_dir, datacenter_frontend_mapping, filenames, file_locations, file_datacenter_mapping
                         ):
-    # Create a Rich table for results
-    table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
+    if file_locations:
+        # Create a Rich table for results
+        table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
 
-    table.add_column("Taget", justify="center")
-    table.add_column("Geolocation Error \[km]", justify="center")
-    table.add_column("Closest Frontend", justify="center")
-    table.add_column("Closest Frontend Error \[km]", justify="center")
+        table.add_column("File Name", justify="center")
+        table.add_column("Taget", justify="center")
+        table.add_column("Geolocation Error \[km]", justify="center")
+        table.add_column("Closest Frontend", justify="center")
+        table.add_column("Closest Frontend Error \[km]", justify="center")
+    else:
+        table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
+
+        table.add_column("File Name", justify="center")
+        table.add_column("Assumed Datacenter", justify="center")
+
 
     # Stages 3-5 - Geolocation
     # Create map of all geolocated targets
-    map_all_targets = MapBuilder("all_targets", probe_locations, frontend_locations)
-    map_all_targets.add_frontends()
+    map_all_targets = MapBuilder("all_targets", cdgeb_utils.probe_locations, cdgeb_utils.frontend_locations)
+    map_all_targets.add_datacenter()
 
     # Initialize a geolocator
-    csp_geolocator = Geolocation(frontend_locations, csp_rates=csp_rates, frontend_continents=frontend_continents)
+    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.datacenter_locations, csp_rates=csp_rates, frontend_continents=cdgeb_utils.frontend_continents)
 
     errors = []
-    for filename in file_locations:
+    for filename in filenames:
         # Geolocate current file using measurements from other frontends
-        frontend = true_file_frontend_mapping[filename]
-        filename = true_frontend_file_mapping[frontend]
         delays_from_server = {frontend_name: csp_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in
-                              csp_delays.keys() \
-                              if filename_d == filename}
-        delays_from_server.pop(frontend)
+                              csp_delays.keys() if filename_d == filename}
+
+
+        if file_datacenter_mapping:
+            true_datacenter = file_datacenter_mapping[filename]
+            true_frontend = datacenter_frontend_mapping[true_datacenter]
+            delays_from_server.pop(true_frontend)
 
         # Geolocation
         estimated_location = csp_geolocator.geolocate_target(delays_from_server)
@@ -275,29 +325,35 @@ def geolocate_from_data(probe_locations,  # Used for map creation
         #     delays_from_server.pop(frontend_name)
         # estimated_location = csp_geolocator.geolocate_target(delays_from_server)
 
-        closest_frontend = csp_geolocator.closest_frontend(estimated_location)
+        closest_datacenter = csp_geolocator.closest_datacenter(estimated_location)
 
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{filename}_estimated', probe_locations, frontend_locations)
-        map_single_target.add_frontends()
+        map_single_target = MapBuilder(f'{filename}_estimated', cdgeb_utils.probe_locations, cdgeb_utils.datacenter_locations)
+        map_single_target.add_datacenter()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
-        map_single_target.add_circle(estimated_location,
-                                     GeolocationUtils.haversine(estimated_location, file_locations[filename]))
-        map_single_target.add_dashed_line(estimated_location, file_locations[filename])
-        map_single_target.add_line(estimated_location, frontend_locations[closest_frontend])
+        if (file_locations):
+            map_single_target.add_circle(estimated_location,
+                                         GeolocationUtils.haversine(estimated_location, file_locations[filename][:2]))
+            map_single_target.add_dashed_line(estimated_location, file_locations[filename][:2])
+        map_single_target.add_line(estimated_location, cdgeb_utils.datacenter_locations[closest_datacenter][:2])
         map_single_target.save_map(Output_dir)
 
-        # Calculate errors
-        geolocation_error = GeolocationUtils.haversine(frontend_locations[frontend], estimated_location)
-        closest_error = GeolocationUtils.haversine(frontend_locations[frontend], frontend_locations[closest_frontend])
+        if file_datacenter_mapping:
+            # Calculate errors
+            geolocation_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:2], estimated_location)
+            closest_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:2],
+                                                       cdgeb_utils.datacenter_locations[closest_datacenter][:2])
 
-        errors.append((geolocation_error, closest_error))
-        table.add_row(frontend,
-                      str(round(geolocation_error, 2)), str(closest_frontend == frontend), str(round(closest_error, 2))
-                      )
+            errors.append((geolocation_error, closest_error))
+            table.add_row(filename, true_datacenter,
+                          str(round(geolocation_error, 2)), str(closest_datacenter == true_datacenter),
+                          str(round(closest_error, 2))
+                          )
 
-        map_all_targets.add_point(estimated_location, f'estimated-location-of-{frontend}',
-                                  color="green" if closest_frontend == frontend else "red")
+            map_all_targets.add_point(estimated_location, f'estimated-location-of-{true_datacenter}',
+                                      color="green" if closest_datacenter == true_datacenter else "red")
+        else:
+            table.add_row(filename, closest_datacenter)
 
     # Print the table
     console = Console()
@@ -307,12 +363,13 @@ def geolocate_from_data(probe_locations,  # Used for map creation
     #     pickle.dump(table, f)
     # with open(output_table_path, 'rb') as f:
     #     test_table = pickle.load(f)
+    if (file_locations):
 
-    rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
-    print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
-    rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
-    print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
-    print()
+        rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
+        print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
+        rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
+        print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
+        print()
     # print(
     #     f'The table is {"" if are_tables_equal(test_table, table) else "not"}similar to the original table before the change!!')
 
@@ -320,28 +377,25 @@ def geolocate_from_data(probe_locations,  # Used for map creation
     map_all_targets.save_map(Output_dir)
 
 
-
-
-
 def geolocation_main(input_dir, output_dir):
     # extra caution is needed here ;)
-    measurements_to_all_targets, probe_locations, probes_continents, frontend_locations, frontend_continents, file_locations, file_continents, true_frontend_file_mapping, true_file_frontend_mapping = \
-        parse_datasets_train(input_dir)
+    measurements_1party, probe_locations_1party, frontend_locations_1party, frontend_continents_1party, cdgeb_utils =\
+        parse_datasets_1party(input_dir)
 
-    measurements_to_all_targets2, probe_locations2, probes_continents2, frontend_locations2, frontend_continents2, filenames = \
-        parse_datasets_test(input_dir)
+    measurements_3party, frontend_locations_3party, filenames, file_locations, file_datacenter_mapping = \
+        parse_datasets_3party(input_dir, cdgeb_utils.datacenter_locations)
 
-    csp_delays, csp_general_rate, csp_rates = learn_from_data(measurements_to_all_targets,
-                                                                                  probe_locations,
-                                                                                  frontend_locations,
-                                                                                  frontend_continents, file_locations,
-                                                                                  true_file_frontend_mapping,
-                                                                                  measurements_to_all_targets2,
-                                                                                  frontend_locations2, filenames)
+    csp_delays, csp_general_rate, csp_rates, datacenter_frontend_mapping = learn_from_data(measurements_1party,
+                                                                                           cdgeb_utils,
+                                                                                           measurements_3party,
+                                                                                           frontend_locations_3party,
+                                                                                           filenames)
 
-    # TODO: csp_rates should actually be recalculated in the geolocate_from_data function (to represent the 'user' rtts and not the 'geolocator' rtts)
-    geolocate_from_data(probe_locations, frontend_locations, frontend_continents, file_locations,
-                        true_frontend_file_mapping, true_file_frontend_mapping, csp_delays, csp_rates, output_dir)
+    geolocate_from_data(cdgeb_utils, csp_delays, csp_rates, output_dir, datacenter_frontend_mapping,filenames,
+                        file_locations, file_datacenter_mapping)
+
+    # TODO: csp_rates should actually be recalculated in the geolocate_from_data function
+    # TODO: (to represent the 'user' rtts and not the 'geolocator' rtts)
 
 
 def main(input_dir, output_dir=None):

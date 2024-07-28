@@ -11,11 +11,11 @@ import os
 
 
 class MapBuilder:
-    def __init__(self, map_name='', probe_locations = None, frontend_locations = None):
+    def __init__(self, map_name='', probe_locations = None, datacenter_locations = None):
         self.map = folium.Map(location=(0, 0), zoom_start=2)
         self.map_name = f'map_{map_name}.html'
         self.probe_locations = probe_locations
-        self.frontend_locations = frontend_locations
+        self.datacenter_locations = datacenter_locations
 
     def add_probes(self):
         # Display all probes
@@ -30,13 +30,13 @@ class MapBuilder:
                                 icon=folium.Icon(color='darkgreen', icon='satellite-dish', prefix='fa')
                                 ).add_to(self.map)
 
-    def add_frontends(self):
+    def add_datacenter(self):
         # Display all frontends
-        if self.frontend_locations:
-            for frontend_name, coordinates in self.frontend_locations.items():
-                folium.Marker(location=coordinates, 
-                                popup=f'{frontend_name}: {str(coordinates)}', 
-                                tooltip=frontend_name,
+        if self.datacenter_locations:
+            for datacenter_name, location in self.datacenter_locations.items():
+                folium.Marker(location=location[:2],
+                                popup=f'{datacenter_name}: {str(location[:2])}',
+                                tooltip=datacenter_name,
                                 icon=folium.Icon(color='blue', icon='server', prefix='fa')
                                 ).add_to(self.map)
 
@@ -64,7 +64,7 @@ class MapBuilder:
 def make_map_with_all_frontends():
     map = MapBuilder('all_frontends')
     map.add_probes()
-    map.add_frontends()
+    map.add_datacenter()
     map.save_map()
 
 # make_map_with_all_frontends()

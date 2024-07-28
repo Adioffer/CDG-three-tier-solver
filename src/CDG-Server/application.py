@@ -39,11 +39,10 @@ def upload_files():
         # Ensure all three files are present
         file1 = request.files.get('measurements')
         file2 = request.files.get('servers')
-        file3 = request.files.get('solution')
-
-        file4 = request.files.get('measurements2')
-        file5 = request.files.get('servers2')
-        file6 = request.files.get('solution2')
+        file3 = request.files.get('measurements2')
+        file4 = request.files.get('servers2')
+        file5 = request.files.get('datacenters')
+        file6 = request.files.get('solution')
 
         if not (file1 and file2 and file3 and file4 and file5 and file6):
             return 'Missing files. Please ensure all three files are uploaded.'
@@ -57,12 +56,13 @@ def upload_files():
         os.makedirs(input_path, exist_ok=True)
         os.makedirs(output_path, exist_ok=True)
 
-        file1.save(os.path.join(input_path, 'measurements.csv'))
-        file2.save(os.path.join(input_path, 'servers.csv'))
-        file3.save(os.path.join(input_path, 'solution.csv'))
-        file4.save(os.path.join(input_path, 'measurements2.csv'))
-        file5.save(os.path.join(input_path, 'servers2.csv'))
-        file6.save(os.path.join(input_path, 'solution2.csv'))
+        file1.save(os.path.join(input_path, 'measurements-1party.csv'))
+        file2.save(os.path.join(input_path, 'servers-1party.csv'))
+        file3.save(os.path.join(input_path, 'measurements-3party.csv'))
+        file4.save(os.path.join(input_path, 'servers-3party.csv'))
+        file5.save(os.path.join(input_path, 'datacenters.csv'))
+        if (file6):
+            file6.save(os.path.join(input_path, 'solution.csv'))
         # Create a temporary file for the CDG output
         temp_output_path = os.path.join(output_path, "results.txt")
 
@@ -103,13 +103,12 @@ def rest_api() -> str:
     # Ensure all three files are present
     file1 = request.files.get('measurements')
     file2 = request.files.get('servers')
-    file3 = request.files.get('solution')
+    file3 = request.files.get('measurements2')
+    file4 = request.files.get('servers2')
+    file5 = request.files.get('datacenters')
+    file6 = request.files.get('solution')
 
-    file4 = request.files.get('measurements2')
-    file5 = request.files.get('servers2')
-    file6 = request.files.get('solution2')
-
-    if not (file1 and file2 and file3 and file4 and file5 and file6):
+    if not (file1 and file2 and file3 and file4 and file5):
         return 'Missing files. Please ensure all three files are uploaded.'
 
     domain_name = request.headers.get('Host')
@@ -126,12 +125,13 @@ def rest_api() -> str:
     os.makedirs(input_path, exist_ok=True)
     os.makedirs(output_path, exist_ok=True)
 
-    file1.save(os.path.join(input_path, 'measurements.csv'))
-    file2.save(os.path.join(input_path, 'servers.csv'))
-    file3.save(os.path.join(input_path, 'solution.csv'))
-    file4.save(os.path.join(input_path, 'measurements2.csv'))
-    file5.save(os.path.join(input_path, 'servers2.csv'))
-    file6.save(os.path.join(input_path, 'solution2.csv'))
+    file1.save(os.path.join(input_path, 'measurements-1party.csv'))
+    file2.save(os.path.join(input_path, 'servers-1party.csv'))
+    file3.save(os.path.join(input_path, 'measurements-3party.csv'))
+    file4.save(os.path.join(input_path, 'servers-3party.csv'))
+    file5.save(os.path.join(input_path, 'datacenters.csv'))
+    if (file6):
+        file6.save(os.path.join(input_path, 'solution.csv'))
 
     # Create a temporary file for the CDG output
     temp_output_path = os.path.join(output_path, "results.txt")
