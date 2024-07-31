@@ -11,27 +11,37 @@ from CDGeB1.common import Continent
 from CDGeB1.plot_map import MapBuilder
 import pickle
 
-DATASET_FILE = 'measurements-1party.csv'
-SERVERS_DATA_FILE = 'servers-1party.csv'
+MEASUREMENT_FILE_1PARTY = 'measurements-1party.csv'
+SERVERS_DATA_FILE_1PARTY = 'servers-1party.csv'
 DATACENTERS_FILE = 'datacenters.csv'
-DATASET_FILE2 = 'measurements-3party.csv'
-SERVERS_DATA_FILE2 = 'servers-3party.csv'
+MEASUREMENT_FILE_3PARTY = 'measurements-3party.csv'
+SERVERS_DATA_FILE_3PARTY = 'servers-3party.csv'
 SOLUTION_DATA_FILE = 'solution.csv'
 
+MEASUREMENT_PROBES = 0
+MEASUREMENT_FRONTENDS = 1
+MEASUREMENT_FILES = 2
+
+MEASUREMENT_FILE_ENTRY_LENGTH = 23
+SERVER_FILE_FULL_ENTRY_LENGTH = 4
+DATACENTER_FILE_ENTRY_LENGTH = 5
+SOLUTION_FILE_ENTRY_LENGTH = 2
+
+COORDINATES_LENGTH = 2
 
 def check_files_exist(input_dir):
-    filepath = os.path.join(input_dir, DATASET_FILE)
+    filepath = os.path.join(input_dir, MEASUREMENT_FILE_1PARTY)
     if not os.path.isfile(filepath):
-        print("Missing file", DATASET_FILE)
+        print("Missing file", MEASUREMENT_FILE_1PARTY)
         return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE)):
-        print("Missing file", SERVERS_DATA_FILE)
+    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY)):
+        print("Missing file", SERVERS_DATA_FILE_1PARTY)
         return False
     if not os.path.isfile(os.path.join(input_dir, DATACENTERS_FILE)):
         return False
-    if not os.path.isfile(os.path.join(input_dir, DATASET_FILE2)):
+    if not os.path.isfile(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY)):
         return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE2)):
+    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY)):
         return False
     return True
 
@@ -46,19 +56,19 @@ def aggregateMeasurements(measurements):
 def parse_datasets_1party(input_dir):
     # Load measurements from CSV
     measurements_1party = dict()
-    with open(os.path.join(input_dir, DATASET_FILE), 'r') as f:
+    with open(os.path.join(input_dir, MEASUREMENT_FILE_1PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
-            if len(row) < 23:
-                print(f"Skipping incomplete row: {row}")
+            if len(row) < MEASUREMENT_FILE_ENTRY_LENGTH:
+                print(f"Skipping incomplete row in file {MEASUREMENT_FILE_1PARTY}: {row}")
                 continue
             probe, frontend, file = row[:3]
             measurements = [float(x) for x in row[3:24]]
             measurements_1party[(probe, frontend, file)] = aggregateMeasurements(measurements)
 
-    probes_set = set([key[0] for key in measurements_1party])
-    frontends_set = set([key[1] for key in measurements_1party])
-    files_set = set([key[2] for key in measurements_1party])
+    probes_set = set([key[MEASUREMENT_PROBES] for key in measurements_1party])
+    frontends_set = set([key[MEASUREMENT_FRONTENDS] for key in measurements_1party])
+    files_set = set([key[MEASUREMENT_FILES] for key in measurements_1party])
 
     # Check for common elements
     if len(probes_set.intersection(frontends_set)) > 0:
@@ -75,10 +85,10 @@ def parse_datasets_1party(input_dir):
     server_locations = dict()
     file_datacenter_mapping = dict()
     server_datacenter_mapping = dict()
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE), 'r') as f:
+    with open(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
-            if len(row) < 4:
+            if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
                 name, datacenter = row[:2]
                 if name in files_set:
                     file_datacenter_mapping[name] = datacenter
@@ -88,15 +98,19 @@ def parse_datasets_1party(input_dir):
                 servername, lat, lon, continent = row[:4]
                 server_locations[servername] = (float(lat), float(lon), Continent(continent))
 
-    datacenter_location = dict()
+    datacenter_locations = dict()
+    filter_datacenter_location = dict()
+
     with open(os.path.join(input_dir, DATACENTERS_FILE), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
-            if len(row) < 4:
-                print(f"Skipping incomplete row: {row}")
+            if len(row) < DATACENTER_FILE_ENTRY_LENGTH:
+                print(f"Skipping incomplete row in file {DATACENTERS_FILE}: {row}")
                 continue
-            name, lat, lon, continent = row[:4]
-            datacenter_location[name] = (float(lat), float(lon), continent)
+            name, lat, lon, continent, only_learn = row[:5]
+            datacenter_locations[name] = (float(lat), float(lon), continent)
+            if not only_learn:
+                filter_datacenter_location[name] = (float(lat), float(lon), continent)
 
     # Check if all probes, frontends and files are in the servers list
     if not all(probe in server_locations for probe in probes_set):
@@ -115,15 +129,15 @@ def parse_datasets_1party(input_dir):
 
     def find_frontend_location(frontend):
         datacenter = server_datacenter_mapping[frontend]
-        return datacenter_location[datacenter]
+        return datacenter_locations[datacenter]
 
     def find_file_location(file):
         datacenter = file_datacenter_mapping[file]
-        return datacenter_location[datacenter]
+        return datacenter_locations[datacenter]
 
-    probe_locations = sortDict({probe: server_locations[probe][:2] for probe in probes_set})
+    probe_locations = sortDict({probe: server_locations[probe][:COORDINATES_LENGTH] for probe in probes_set})
     frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
-    frontend_continents = sortDict({frontend: find_frontend_location(frontend)[2] for frontend in frontends_set})
+    frontend_continents = sortDict({frontend: find_frontend_location(frontend)[COORDINATES_LENGTH] for frontend in frontends_set})
     file_locations = sortDict({file: find_file_location(file) for file in files_set})
 
     cdgeb_geolocation_utils = GeolocationUtils(
@@ -132,7 +146,7 @@ def parse_datasets_1party(input_dir):
         frontend_locations=frontend_locations,
         frontend_continents=frontend_continents,
         file_locations=file_locations,
-        datacenter_locations=datacenter_location
+        datacenter_locations=filter_datacenter_location
     )
 
     return measurements_1party, probe_locations, frontend_locations, frontend_continents, \
@@ -142,26 +156,26 @@ def parse_datasets_1party(input_dir):
 def parse_datasets_3party(input_dir, datacenter_location):
     # Load measurements from CSV
     measurements_3party = dict()
-    with open(os.path.join(input_dir, DATASET_FILE), 'r') as f:
+    with open(os.path.join(input_dir, MEASUREMENT_FILE_1PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
-            if len(row) < 23:
-                print(f"Skipping incomplete row: {row}")
+            if len(row) < MEASUREMENT_FILE_ENTRY_LENGTH:
+                print(f"Skipping incomplete row in file {DATACENTERS_FILE}: {row}")
                 continue
             probe, frontend, file = row[:3]
             measurements = [float(x) for x in row[3:24]]
             measurements_3party[(probe, frontend, file)] = aggregateMeasurements(measurements)
 
-    probes_set = set([key[0] for key in measurements_3party])
-    frontends_set = set([key[1] for key in measurements_3party])
-    files_set = set([key[2] for key in measurements_3party])
+    probes_set = set([key[MEASUREMENT_PROBES] for key in measurements_3party])
+    frontends_set = set([key[MEASUREMENT_FRONTENDS] for key in measurements_3party])
+    files_set = set([key[MEASUREMENT_FILES] for key in measurements_3party])
     # Load servers data
     server_locations = dict()
     server_datacenter_mapping = dict()
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE2), 'r') as f:
+    with open(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
-            if len(row) < 4:
+            if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
                 name, datacenter = row[:2]
                 if name in frontends_set:
                     server_datacenter_mapping[name] = datacenter
@@ -197,7 +211,7 @@ def parse_datasets_3party(input_dir, datacenter_location):
         with open(os.path.join(input_dir, SOLUTION_DATA_FILE), 'r') as f:
             reader = csv.reader(f)
             for row in reader:
-                if len(row) >= 2:
+                if len(row) >= SOLUTION_FILE_ENTRY_LENGTH:
                     file, datacenter = row[:2]
                     file_datacenter_mapping[file] = datacenter
         file_locations = {file: datacenter_location[datacenter] for file, datacenter in file_datacenter_mapping.items()}
@@ -333,16 +347,16 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
         map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
         if (file_locations):
             map_single_target.add_circle(estimated_location,
-                                         GeolocationUtils.haversine(estimated_location, file_locations[filename][:2]))
-            map_single_target.add_dashed_line(estimated_location, file_locations[filename][:2])
-        map_single_target.add_line(estimated_location, cdgeb_utils.datacenter_locations[closest_datacenter][:2])
+                                         GeolocationUtils.haversine(estimated_location, file_locations[filename][:COORDINATES_LENGTH]))
+            map_single_target.add_dashed_line(estimated_location, file_locations[filename][:COORDINATES_LENGTH])
+        map_single_target.add_line(estimated_location, cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
         map_single_target.save_map(Output_dir)
 
         if file_datacenter_mapping:
             # Calculate errors
-            geolocation_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:2], estimated_location)
-            closest_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:2],
-                                                       cdgeb_utils.datacenter_locations[closest_datacenter][:2])
+            geolocation_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH], estimated_location)
+            closest_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH],
+                                                       cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
 
             errors.append((geolocation_error, closest_error))
             table.add_row(filename, true_datacenter,
@@ -419,7 +433,6 @@ if __name__ == '__main__':
     else:
         # Run from src. (python -m CDGeB1.main)
         input_dir = 'Datasets/BGU-150823/'
-        own_dataset = os.path.join(input_dir, 'my_dataset')
         third_pary_dataset = os.path.join(input_dir, '3_party')
         # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240216'
         # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
