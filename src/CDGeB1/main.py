@@ -88,6 +88,9 @@ def parse_datasets_1party(input_dir):
     with open(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
+            if len(row) == 0:
+                # Skip empty lines
+                continue
             if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
                 name, datacenter = row[:2]
                 if name in files_set:
@@ -175,6 +178,9 @@ def parse_datasets_3party(input_dir, datacenter_location):
     with open(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
+            if len(row) == 0:
+                # Skip empty lines
+                continue
             if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
                 name, datacenter = row[:2]
                 if name in frontends_set:

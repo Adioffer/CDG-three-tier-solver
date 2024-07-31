@@ -1,5 +1,18 @@
 # Three-tier Solver
 
+
+## Configuration
+```
+pip install -r requirements.txt
+```
+
+Make sure to have a directory link to CDGeB1\ in CDG-server\:
+- open ```CMD.exe``` as Administrator
+- cd into ```CDG-Server\```
+- Type: ```mklink  /D CDGeB1 ..\CDGeB1```
+
+## Running
+
 ### Run Web server locally:
 ```
 cd src
@@ -27,6 +40,8 @@ python -m CDGeB1.main
    - ```application.py```
    - ```requirements.txt```
 3. AWS Beanstalk -> N. Virginia (us-east-1) -> Cdg-4-env -> Upload and deploy
+
+
 
 ## Roadmap
 Must:
