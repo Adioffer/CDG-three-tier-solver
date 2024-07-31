@@ -233,12 +233,17 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
     cdgeb_geolocation_utils.closest_file_for_frontend = closest_file_for_frontend
 
     rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_1party)
+    csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
+    cdgeb_geolocation_utils.csp_delays = csp_delays
+
+    csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
+    csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
 
     rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_1party, measurements_3party,
                                                                       frontend_locations_3party, filenames_3party)
-
     csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
     cdgeb_geolocation_utils.csp_delays = csp_delays
+
 
     datacenter_frontend_mapping = {datacenter: frontend for datacenter, datacenter_loc in
                                    cdgeb_geolocation_utils.datacenter_locations.items() for frontend, frontend_loc in
@@ -248,8 +253,7 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
     # TODO
 
     # Stage 2 - Compute transmission rates within CSP
-    csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
-    csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
+
 
     # Print results
     GeolocationUtils.pretty_print_rates(csp_rates)
