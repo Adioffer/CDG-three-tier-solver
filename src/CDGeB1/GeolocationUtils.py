@@ -185,14 +185,14 @@ class GeolocationUtils():
 
     def compute_csp_delays_test(self, measurements_1party, measurements_3party, frontend_3party, filenames):
         rtts_within_csp = dict()
-        for frontend in frontend_3party:
-            closest_file = self.closest_file_for_frontend[frontend]
-            closest_probe = self.closets_probe_to_frontends[frontend]
+        for frontend_3party in frontend_3party:
+            closest_file_in_1party = self.closest_file_for_frontend[frontend_3party]
+            closest_probe_in_1party = self.closets_probe_to_frontends[frontend_3party]
 
             for filename in filenames:
-                rtts_within_csp[(frontend, filename)] = \
-                    measurements_3party[(closest_probe, frontend, filename)] - \
-                    measurements_1party[(closest_probe, frontend, closest_file)]
+                rtts_within_csp[(frontend_3party, filename)] = \
+                    measurements_3party[(closest_probe_in_1party, frontend_3party, filename)] - \
+                    measurements_1party[(closest_probe_in_1party, frontend_3party, closest_file_in_1party)]
 
         return rtts_within_csp
 

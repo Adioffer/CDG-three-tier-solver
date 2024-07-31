@@ -37,10 +37,10 @@ def download_zip(filepath):
 def upload_files():
     if request.method == 'POST':
         # Ensure all three files are present
-        file1 = request.files.get('measurements')
-        file2 = request.files.get('servers')
-        file3 = request.files.get('measurements2')
-        file4 = request.files.get('servers2')
+        file1 = request.files.get('measurements-1party')
+        file2 = request.files.get('servers-1party')
+        file3 = request.files.get('measurements-3party')
+        file4 = request.files.get('servers-3party')
         file5 = request.files.get('datacenters')
         file6 = request.files.get('solution')
 
@@ -101,10 +101,10 @@ def upload_files():
 @application.route('/rest', methods=['POST'])
 def rest_api() -> str:
     # Ensure all three files are present
-    file1 = request.files.get('measurements')
-    file2 = request.files.get('servers')
-    file3 = request.files.get('measurements2')
-    file4 = request.files.get('servers2')
+    file1 = request.files.get('measurements-1party')
+    file2 = request.files.get('servers-1party')
+    file3 = request.files.get('measurements-3party')
+    file4 = request.files.get('servers-3party')
     file5 = request.files.get('datacenters')
     file6 = request.files.get('solution')
 
