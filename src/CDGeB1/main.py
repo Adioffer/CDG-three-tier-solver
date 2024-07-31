@@ -159,7 +159,7 @@ def parse_datasets_1party(input_dir):
 def parse_datasets_3party(input_dir, datacenter_location):
     # Load measurements from CSV
     measurements_3party = dict()
-    with open(os.path.join(input_dir, MEASUREMENT_FILE_1PARTY), 'r') as f:
+    with open(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY), 'r') as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
             if len(row) < MEASUREMENT_FILE_ENTRY_LENGTH:
