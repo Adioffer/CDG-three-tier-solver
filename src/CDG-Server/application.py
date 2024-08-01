@@ -69,9 +69,11 @@ def upload_files():
         original_stdout = sys.stdout
         with open(temp_output_path, 'w') as f:
             sys.stdout = f
-            CDG_main(input_path, output_path)
-            # Reset sys.stdout to its original value
-            sys.stdout = original_stdout
+            try:
+                CDG_main(input_path, output_path)
+            finally:
+                # Reset sys.stdout to its original value
+                sys.stdout = original_stdout
 
         # Create a temporary file for the ZIP to be sent in response
         zip_output_fd, zip_output_path = tempfile.mkstemp(dir=session_dir, prefix='CDG_', suffix='.zip')
@@ -139,9 +141,11 @@ def rest_api() -> str:
     original_stdout = sys.stdout
     with open(temp_output_path, 'w') as f:
         sys.stdout = f
-        CDG_main(input_path, output_path)
-        # Reset sys.stdout to its original value
-        sys.stdout = original_stdout
+        try:
+            CDG_main(input_path, output_path)
+        finally:
+            # Reset sys.stdout to its original value
+            sys.stdout = original_stdout
 
     outputAsDict = {}
     outputAsDict['Meta'] = {}
