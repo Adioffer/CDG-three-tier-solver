@@ -298,9 +298,9 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
 
         table.add_column("File Name", justify="center")
         table.add_column("Taget", justify="center")
-        table.add_column("Geolocation Error \[km]", justify="center")
+        table.add_column("Geolocation Error [km]", justify="center")
         table.add_column("Closest Frontend", justify="center")
-        table.add_column("Closest Frontend Error \[km]", justify="center")
+        table.add_column("Closest Frontend Error [km]", justify="center")
     else:
         table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
 
