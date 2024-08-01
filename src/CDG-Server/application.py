@@ -5,7 +5,6 @@ import zipfile
 import json
 import datetime
 from multiprocessing import freeze_support
-from werkzeug.utils import secure_filename
 from flask import Flask, request, render_template, send_from_directory
 
 from CDGeB1.main import main as CDG_main
