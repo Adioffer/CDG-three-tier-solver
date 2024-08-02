@@ -43,6 +43,9 @@ def upload_files():
         file5 = request.files.get('datacenters')
         file6 = request.files.get('solution')
 
+        method = request.form['method']
+
+
         if not (file1 and file2 and file3 and file4 and file5):
             return 'Missing files. Please ensure all three files are uploaded.'
 
@@ -70,7 +73,7 @@ def upload_files():
         with open(temp_output_path, 'w') as f:
             sys.stdout = f
             try:
-                CDG_main(input_path, output_path)
+                CDG_main(input_path, output_path, method)
             finally:
                 # Reset sys.stdout to its original value
                 sys.stdout = original_stdout

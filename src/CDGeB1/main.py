@@ -5,10 +5,14 @@ from statistics import mean, median
 import numpy as np
 from rich.console import Console
 from rich.table import Table
+from scipy.optimize import minimize
+
 from CDGeB1.GeolocationUtils import GeolocationUtils
 from CDGeB1.GeolocationCSP import Geolocation
 from CDGeB1.common import Continent
 from CDGeB1.plot_map import MapBuilder
+import itertools
+import random
 import pickle
 
 MEASUREMENT_FILE_1PARTY = 'measurements-1party.csv'
@@ -29,6 +33,10 @@ SOLUTION_FILE_ENTRY_LENGTH = 2
 
 COORDINATES_LENGTH = 2
 
+ORIGINAL_METHOD = "original"
+OPTIMIZER_METHOD = "optimizer"
+
+
 def check_files_exist(input_dir):
     filepath = os.path.join(input_dir, MEASUREMENT_FILE_1PARTY)
     if not os.path.isfile(filepath):
@@ -38,10 +46,13 @@ def check_files_exist(input_dir):
         print("Missing file", SERVERS_DATA_FILE_1PARTY)
         return False
     if not os.path.isfile(os.path.join(input_dir, DATACENTERS_FILE)):
+        print("Missing file", DATACENTERS_FILE)
         return False
     if not os.path.isfile(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY)):
+        print("Missing file", MEASUREMENT_FILE_3PARTY)
         return False
     if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY)):
+        print("Missing file", SERVERS_DATA_FILE_3PARTY)
         return False
     return True
 
@@ -140,7 +151,8 @@ def parse_datasets_1party(input_dir):
 
     probe_locations = sortDict({probe: server_locations[probe][:COORDINATES_LENGTH] for probe in probes_set})
     frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
-    frontend_continents = sortDict({frontend: find_frontend_location(frontend)[COORDINATES_LENGTH] for frontend in frontends_set})
+    frontend_continents = sortDict(
+        {frontend: find_frontend_location(frontend)[COORDINATES_LENGTH] for frontend in frontends_set})
     file_locations = sortDict({file: find_file_location(file) for file in files_set})
 
     cdgeb_geolocation_utils = GeolocationUtils(
@@ -226,7 +238,7 @@ def parse_datasets_3party(input_dir, datacenter_location):
 
 
 def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3party, frontend_locations_3party,
-                    filenames_3party):
+                    filenames_3party, method):
     # Stage 1 - Compute delays within CSP
 
     distance_map = cdgeb_geolocation_utils.build_distance_map()
@@ -245,11 +257,19 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
     csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
     csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
 
-    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_1party, measurements_3party,
-                                                                      frontend_locations_3party, filenames_3party)
+    if method == ORIGINAL_METHOD:
+        rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_1party, measurements_3party,
+                                                                          frontend_locations_3party, filenames_3party)
+    elif method == OPTIMIZER_METHOD:
+        rtts_within_csp = compute_csp_delays_optimizer(
+            cdgeb_geolocation_utils, measurements_3party, frontend_locations_3party, filenames_3party)
+
+    else:
+        print('ERROR: method option is not valid')
+        return
+
     csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
     cdgeb_geolocation_utils.csp_delays = csp_delays
-
 
     datacenter_frontend_mapping = {datacenter: frontend for datacenter, datacenter_loc in
                                    cdgeb_geolocation_utils.datacenter_locations.items() for frontend, frontend_loc in
@@ -259,7 +279,6 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
     # TODO
 
     # Stage 2 - Compute transmission rates within CSP
-
 
     # Print results
     GeolocationUtils.pretty_print_rates(csp_rates)
@@ -307,21 +326,20 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
         table.add_column("File Name", justify="center")
         table.add_column("Assumed Datacenter", justify="center")
 
-
     # Stages 3-5 - Geolocation
     # Create map of all geolocated targets
     map_all_targets = MapBuilder("all_targets", cdgeb_utils.probe_locations, cdgeb_utils.frontend_locations)
     map_all_targets.add_datacenter()
 
     # Initialize a geolocator
-    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.datacenter_locations, csp_rates=csp_rates, frontend_continents=cdgeb_utils.frontend_continents)
+    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.datacenter_locations, csp_rates=csp_rates,
+                                 frontend_continents=cdgeb_utils.frontend_continents)
 
     errors = []
     for filename in filenames:
         # Geolocate current file using measurements from other frontends
         delays_from_server = {frontend_name: csp_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in
                               csp_delays.keys() if filename_d == filename}
-
 
         if file_datacenter_mapping:
             true_datacenter = file_datacenter_mapping[filename]
@@ -352,21 +370,26 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
         closest_datacenter = csp_geolocator.closest_datacenter(estimated_location)
 
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{filename}_estimated', cdgeb_utils.probe_locations, cdgeb_utils.datacenter_locations)
+        map_single_target = MapBuilder(f'{filename}_estimated', cdgeb_utils.probe_locations,
+                                       cdgeb_utils.datacenter_locations)
         map_single_target.add_datacenter()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
         if (file_locations):
             map_single_target.add_circle(estimated_location,
-                                         GeolocationUtils.haversine(estimated_location, file_locations[filename][:COORDINATES_LENGTH]))
+                                         GeolocationUtils.haversine(estimated_location,
+                                                                    file_locations[filename][:COORDINATES_LENGTH]))
             map_single_target.add_dashed_line(estimated_location, file_locations[filename][:COORDINATES_LENGTH])
-        map_single_target.add_line(estimated_location, cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
+        map_single_target.add_line(estimated_location,
+                                   cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
         map_single_target.save_map(Output_dir)
 
         if file_datacenter_mapping:
             # Calculate errors
-            geolocation_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH], estimated_location)
-            closest_error = GeolocationUtils.haversine(cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH],
-                                                       cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
+            geolocation_error = GeolocationUtils.haversine(
+                cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH], estimated_location)
+            closest_error = GeolocationUtils.haversine(
+                cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH],
+                cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
 
             errors.append((geolocation_error, closest_error))
             table.add_row(filename, true_datacenter,
@@ -388,7 +411,6 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
     # with open(output_table_path, 'rb') as f:
     #     test_table = pickle.load(f)
     if (file_locations):
-
         rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
         print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
         rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
@@ -401,9 +423,120 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
     map_all_targets.save_map(Output_dir)
 
 
-def geolocation_main(input_dir, output_dir):
+# def optimizer_learn_from_data(cdgeb_utils_first_party, measurements_3party, frontend_locations_3party,
+#                               files_set):
+#     files_list = list(files_set)
+#     probes_list = cdgeb_utils_first_party.probe_locations
+#     frontends_list = frontend_locations_3party.keys()
+#     n_probes = len(probes_list)
+#     n_frontends = len(frontends_list)
+#     n_files = len(files_list)
+#
+#     rtt_measured = np.zeros((n_probes, n_frontends, n_files, n_files))
+#     for l, fe in enumerate(frontends_list):
+#         for k, probe in enumerate(probes_list):
+#             for i in range(n_files):
+#                 rtt_measured[k, l, i] = measurements_3party[(probe, fe, files_list[i])]
+#
+#
+#     rtt_initial = np.zeros(n_probes, n_files, )
+#
+#     rtt_measured_flat = rtt_measured.flatten()
+#     speed_of_light = 299792
+#     c = 9 / (4 * speed_of_light)
+#
+#     initial_params = (
+#         [random.uniform(0, 1) for _ in range(n_frontends)]
+#     )
+#
+#     param_bounds = (
+#         [(0, None) for _ in range(n_frontends)]
+#     )
+#
+#     initial_params = np.array(initial_params, dtype=np.float64)
+#     param_bounds = np.array(param_bounds, dtype=np.float64)
+#     loss_history = []
+#
+#     def loss_func(params):
+#         w_i_values = params
+#         rtt_prime = np.zeros((n_probes, n_frontends, n_files))
+#
+#         for l, fe in enumerate(frontend_locations_3party):
+#             for k in range(n_probes):
+#                 for i in range(n_files):
+#                     rtt_prime[k, l, i] = w_i_values[i]
+#         rtt_prime_flat = rtt_prime.flatten()
+#
+#         E = 0.5 * np.sum(rtt_prime_flat - rtt_measured_flat)
+#
+#         return E
+#
+#     def optimization_callback(x):
+#         loss = loss_func(x)
+#         loss_history.append(loss)
+#         print(f'Current loss: {loss}')
+#
+#     result = minimize(lambda params: loss_func(params), initial_params, method='L-BFGS-B', bounds=param_bounds,
+#                       options={'ftol': 1e-12}, callback=optimization_callback)
+#
+#     # Evaluation
+#     optimized_rates = result.x[:n_frontends]
+#     optimized_distance = result.x[n_frontends:]
+#     rtt = dict()
+#     for i, fe in enumerate(frontend_locations_3party):
+#         for j, file in enumerate(cdgeb_utils_first_party.file_locations):
+#             rtt[(fe, file)] = optimized_rates[i] * optimized_distance[j * n_files + i] * 2
+#     return rtt, optimized_rates, 4
+
+def compute_csp_delays_optimizer(cdgeb_utils_1party, measurements_3party, frontend_locations_3party,
+                                 files_set):
+
+
+    probes = list(cdgeb_utils_1party.probe_locations.keys())
+    servers = list(cdgeb_utils_1party.frontend_locations.keys())
+    files = list(files_set)
+
+    num_probes = len(probes)
+    num_servers = len(servers)
+    num_files = len(files)
+
+    # Initial guess for the delays
+    initial_guess = np.zeros(num_probes * num_servers + num_servers * num_files)
+    param_bounds = (
+        [(0, None) for _ in range(len(initial_guess))]
+    )
+
+    def loss(x):
+        probe_server_delays = x[:num_probes * num_servers].reshape((num_probes, num_servers))
+        server_file_delays = x[num_probes * num_servers:].reshape((num_servers, num_files))
+
+        total_loss = 0
+        for measure in measurements_3party:
+            probe, server, file = measure
+            measured_delay = measurements_3party[measure]
+            p = probes.index(probe)
+            s = servers.index(server)
+            f = files.index(file)
+            estimated_delay = probe_server_delays[p, s] + server_file_delays[s, f]
+            total_loss += (measured_delay - estimated_delay) ** 2
+        return total_loss
+
+    result = minimize(loss, initial_guess, method='L-BFGS-B', bounds=param_bounds)
+
+    optimized_delays = result.x
+    probe_server_delays = optimized_delays[:num_probes * num_servers].reshape((num_probes, num_servers))
+    server_file_delays = optimized_delays[num_probes * num_servers:].reshape((num_servers, num_files))
+
+    rtts_within_csp = {(servers[i], files[j]): server_file_delays[i][j] for i in range(len(server_file_delays)) for j in range(len(server_file_delays[i]))}
+
+    return rtts_within_csp
+
+
+
+
+def geolocation_main(input_dir, output_dir, method):
     # extra caution is needed here ;)
-    measurements_1party, probe_locations_1party, frontend_locations_1party, frontend_continents_1party, cdgeb_utils =\
+    measurements_1party, probe_locations_1party, frontend_locations_1party, frontend_continents_1party, cdgeb_utils = \
         parse_datasets_1party(input_dir)
 
     measurements_3party, frontend_locations_3party, filenames, file_locations, file_datacenter_mapping = \
@@ -413,7 +546,7 @@ def geolocation_main(input_dir, output_dir):
                                                                                            cdgeb_utils,
                                                                                            measurements_3party,
                                                                                            frontend_locations_3party,
-                                                                                           filenames)
+                                                                                           filenames, method)
 
     geolocate_from_data(cdgeb_utils, csp_delays, csp_rates, output_dir, datacenter_frontend_mapping, filenames,
                         file_locations, file_datacenter_mapping)
@@ -422,7 +555,7 @@ def geolocation_main(input_dir, output_dir):
     # TODO: (to represent the 'user' rtts and not the 'geolocator' rtts)
 
 
-def main(input_dir, output_dir=None):
+def main(input_dir, output_dir=None, method=None):
     if not output_dir:
         output_dir = os.path.join(input_dir, 'out')
     if not check_files_exist(input_dir):
@@ -433,7 +566,7 @@ def main(input_dir, output_dir=None):
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    geolocation_main(input_dir, output_dir)
+    geolocation_main(input_dir, output_dir, method)
 
 
 if __name__ == '__main__':
@@ -443,13 +576,13 @@ if __name__ == '__main__':
     else:
         # Run from src. (python -m CDGeB1.main)
         input_dir = 'Datasets/BGU-150823/'
-        third_pary_dataset = os.path.join(input_dir, '3_party')
+        # third_party_dataset = os.path.join(input_dir, '3_party')
         # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240216'
         # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
 
     if len(sys.argv) > 2:
-        Output_dir = sys.argv[2]
+        output_dir = sys.argv[2]
     else:
-        Output_dir = None  # Use default
+        output_dir = None  # Use default
 
-    main(input_dir, Output_dir)
+    main(input_dir, output_dir, OPTIMIZER_METHOD)
