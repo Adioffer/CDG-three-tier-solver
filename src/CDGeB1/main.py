@@ -249,8 +249,11 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
 
     closest_file_for_frontend = cdgeb_geolocation_utils.determine_closest_files(measurements_1party)
     cdgeb_geolocation_utils.closest_file_for_frontend = closest_file_for_frontend
-
-    rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_1party)
+    if method == ORIGINAL_METHOD:
+        rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_1party)
+    else:
+        rtts_within_csp = compute_csp_delays_optimizer(
+            cdgeb_geolocation_utils, measurements_1party, cdgeb_geolocation_utils.frontend_locations, filenames_3party)
     csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
     cdgeb_geolocation_utils.csp_delays = csp_delays
 
@@ -423,74 +426,9 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
     map_all_targets.save_map(Output_dir)
 
 
-# def optimizer_learn_from_data(cdgeb_utils_first_party, measurements_3party, frontend_locations_3party,
-#                               files_set):
-#     files_list = list(files_set)
-#     probes_list = cdgeb_utils_first_party.probe_locations
-#     frontends_list = frontend_locations_3party.keys()
-#     n_probes = len(probes_list)
-#     n_frontends = len(frontends_list)
-#     n_files = len(files_list)
-#
-#     rtt_measured = np.zeros((n_probes, n_frontends, n_files, n_files))
-#     for l, fe in enumerate(frontends_list):
-#         for k, probe in enumerate(probes_list):
-#             for i in range(n_files):
-#                 rtt_measured[k, l, i] = measurements_3party[(probe, fe, files_list[i])]
-#
-#
-#     rtt_initial = np.zeros(n_probes, n_files, )
-#
-#     rtt_measured_flat = rtt_measured.flatten()
-#     speed_of_light = 299792
-#     c = 9 / (4 * speed_of_light)
-#
-#     initial_params = (
-#         [random.uniform(0, 1) for _ in range(n_frontends)]
-#     )
-#
-#     param_bounds = (
-#         [(0, None) for _ in range(n_frontends)]
-#     )
-#
-#     initial_params = np.array(initial_params, dtype=np.float64)
-#     param_bounds = np.array(param_bounds, dtype=np.float64)
-#     loss_history = []
-#
-#     def loss_func(params):
-#         w_i_values = params
-#         rtt_prime = np.zeros((n_probes, n_frontends, n_files))
-#
-#         for l, fe in enumerate(frontend_locations_3party):
-#             for k in range(n_probes):
-#                 for i in range(n_files):
-#                     rtt_prime[k, l, i] = w_i_values[i]
-#         rtt_prime_flat = rtt_prime.flatten()
-#
-#         E = 0.5 * np.sum(rtt_prime_flat - rtt_measured_flat)
-#
-#         return E
-#
-#     def optimization_callback(x):
-#         loss = loss_func(x)
-#         loss_history.append(loss)
-#         print(f'Current loss: {loss}')
-#
-#     result = minimize(lambda params: loss_func(params), initial_params, method='L-BFGS-B', bounds=param_bounds,
-#                       options={'ftol': 1e-12}, callback=optimization_callback)
-#
-#     # Evaluation
-#     optimized_rates = result.x[:n_frontends]
-#     optimized_distance = result.x[n_frontends:]
-#     rtt = dict()
-#     for i, fe in enumerate(frontend_locations_3party):
-#         for j, file in enumerate(cdgeb_utils_first_party.file_locations):
-#             rtt[(fe, file)] = optimized_rates[i] * optimized_distance[j * n_files + i] * 2
-#     return rtt, optimized_rates, 4
-
 def compute_csp_delays_optimizer(cdgeb_utils_1party, measurements_3party, frontend_locations_3party,
                                  files_set):
-
+    measurements_reduced = {k: v for k, v in measurements_3party.items() if k[0] == cdgeb_utils_1party.closets_probe_to_frontends[k[1]]}
 
     probes = list(cdgeb_utils_1party.probe_locations.keys())
     servers = list(cdgeb_utils_1party.frontend_locations.keys())
@@ -511,9 +449,9 @@ def compute_csp_delays_optimizer(cdgeb_utils_1party, measurements_3party, fronte
         server_file_delays = x[num_probes * num_servers:].reshape((num_servers, num_files))
 
         total_loss = 0
-        for measure in measurements_3party:
+        for measure in measurements_reduced:
             probe, server, file = measure
-            measured_delay = measurements_3party[measure]
+            measured_delay = measurements_reduced[measure]
             p = probes.index(probe)
             s = servers.index(server)
             f = files.index(file)
@@ -527,11 +465,10 @@ def compute_csp_delays_optimizer(cdgeb_utils_1party, measurements_3party, fronte
     probe_server_delays = optimized_delays[:num_probes * num_servers].reshape((num_probes, num_servers))
     server_file_delays = optimized_delays[num_probes * num_servers:].reshape((num_servers, num_files))
 
-    rtts_within_csp = {(servers[i], files[j]): server_file_delays[i][j] for i in range(len(server_file_delays)) for j in range(len(server_file_delays[i]))}
+    rtts_within_csp = {(servers[i], files[j]): server_file_delays[i][j] for i in range(len(server_file_delays)) for j in
+                       range(len(server_file_delays[i]))}
 
     return rtts_within_csp
-
-
 
 
 def geolocation_main(input_dir, output_dir, method):
@@ -585,4 +522,4 @@ if __name__ == '__main__':
     else:
         output_dir = None  # Use default
 
-    main(input_dir, output_dir, OPTIMIZER_METHOD)
+    main(input_dir, output_dir, ORIGINAL_METHOD)
