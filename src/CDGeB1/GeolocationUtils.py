@@ -210,10 +210,13 @@ class GeolocationUtils():
         for frontend in self.frontend_locations:
             for filename in self.file_locations:
                 # Filter the relevant measurements
-                if continent_a and continent_b:
-                    if continent_a != self.frontend_continents[frontend] or \
-                            continent_b != self.datacenter_locations[self.file_frontend_mapping[filename]][2]:
-                        continue
+                if continent_a and continent_a != self.frontend_continents[frontend]:
+                    # If continent_a is provided, skip irrelevant frontends
+                    continue
+
+                if continent_b and continent_b != self.datacenter_locations[self.file_frontend_mapping[filename]][2]:
+                    # If continent_b is provided, skip irrelevant files
+                    continue
 
                 distance = self.csp_distances[(frontend, filename)]
                 delay = self.csp_delays[(frontend, filename)]
@@ -236,10 +239,15 @@ class GeolocationUtils():
         """
         Computes the transmission rates within the CSP's network, considering the continents.
         """
+        # rates = dict()
+        # for continent_a in Continent:
+        #     for continent_b in Continent:
+        #         rate = self._evaluate_rates_inner(continent_a, continent_b)
+        #         rates[(continent_a, continent_b)] = rate
+
         rates = dict()
         for continent_a in Continent:
-            for continent_b in Continent:
-                rate = self._evaluate_rates_inner(continent_a, continent_b)
-                rates[(continent_a, continent_b)] = rate
+            rate = self._evaluate_rates_inner(continent_a)
+            rates[continent_a] = rate
 
         return rates

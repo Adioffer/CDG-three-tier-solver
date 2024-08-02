@@ -30,7 +30,8 @@ class Geolocation():
         @param target_assumed_continent: assumed continent of the file, which impacts the rate constansts
         return: distance in kilometers
         """
-        return delay * self.csp_rates[(src_continent, target_assumed_continent)]
+        # return delay * self.csp_rates[(src_continent, target_assumed_continent)]
+        return delay * self.csp_rates[src_continent]
 
     def delay_to_distance(self, delay: float) -> float:
         """

@@ -267,7 +267,7 @@ def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3
 
 
     # Print results
-    GeolocationUtils.pretty_print_rates(csp_rates)
+    # GeolocationUtils.pretty_print_rates(csp_rates)
     print("Rates within CSP (All measuremenets):", csp_general_rate)
     print()
 
