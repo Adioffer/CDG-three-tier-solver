@@ -102,7 +102,7 @@ def parse_datasets_1party(input_dir):
                 server_locations[servername] = (float(lat), float(lon), Continent(continent))
 
     datacenter_locations = dict()
-    filter_datacenter_location = dict()
+    possible_file_locations = dict()
 
     with open(os.path.join(input_dir, DATACENTERS_FILE), 'r') as f:
         csv_reader = csv.reader(f)
@@ -112,8 +112,12 @@ def parse_datasets_1party(input_dir):
                 continue
             name, lat, lon, continent, only_learn = row[:5]
             datacenter_locations[name] = (float(lat), float(lon), continent)
-            if not only_learn:
-                filter_datacenter_location[name] = (float(lat), float(lon), continent)
+            if only_learn and only_learn == 'learn_only':
+                print("Found learn_only:", name)
+                pass
+            else:
+                possible_file_locations[name] = (float(lat), float(lon), continent)
+                print("Possible location:", name)
 
     # Check if all probes, frontends and files are in the servers list
     if not all(probe in server_locations for probe in probes_set):
@@ -149,7 +153,8 @@ def parse_datasets_1party(input_dir):
         frontend_locations=frontend_locations,
         frontend_continents=frontend_continents,
         file_locations=file_locations,
-        datacenter_locations=filter_datacenter_location
+        datacenter_locations=datacenter_locations,
+        possible_file_locations=possible_file_locations
     )
 
     return measurements_1party, probe_locations, frontend_locations, frontend_continents, \
@@ -314,7 +319,7 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
     map_all_targets.add_datacenter()
 
     # Initialize a geolocator
-    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.datacenter_locations, csp_rates=csp_rates, frontend_continents=cdgeb_utils.frontend_continents)
+    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.possible_file_locations, csp_rates=csp_rates, frontend_continents=cdgeb_utils.frontend_continents)
 
     errors = []
     for filename in filenames:
@@ -349,13 +354,13 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
         #     delays_from_server.pop(frontend_name)
         # estimated_location = csp_geolocator.geolocate_target(delays_from_server)
 
-        closest_datacenter = csp_geolocator.closest_datacenter(estimated_location)
+        closest_datacenter = csp_geolocator.position_correction(estimated_location)
 
         # Make target-specific map file
         map_single_target = MapBuilder(f'{filename}_estimated', cdgeb_utils.probe_locations, cdgeb_utils.datacenter_locations)
         map_single_target.add_datacenter()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
-        if (file_locations):
+        if file_locations:
             map_single_target.add_circle(estimated_location,
                                          GeolocationUtils.haversine(estimated_location, file_locations[filename][:COORDINATES_LENGTH]))
             map_single_target.add_dashed_line(estimated_location, file_locations[filename][:COORDINATES_LENGTH])
@@ -387,8 +392,7 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
     #     pickle.dump(table, f)
     # with open(output_table_path, 'rb') as f:
     #     test_table = pickle.load(f)
-    if (file_locations):
-
+    if file_locations:
         rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
         print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
         rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))

@@ -5,7 +5,7 @@ from CDGeB1.GeolocationUtils import GeolocationUtils
 
 
 class Geolocation():
-    def __init__(self, fe_locations: dict, dc_locations,
+    def __init__(self, fe_locations: dict, possible_file_locations: dict,
                  csp_general_rate: float=None, csp_rates: dict=None, frontend_continents: dict =None):
         """
         @param fe_locations: dict of front-end names and their (lat, long) coordinates.
@@ -15,7 +15,7 @@ class Geolocation():
         """
         
         self.fe_locations = fe_locations
-        self.dc_locations = dc_locations
+        self.possible_file_locations = possible_file_locations
         self.frontend_continents = frontend_continents
         self.csp_general_rate = csp_general_rate
         self.csp_rates = csp_rates
@@ -125,12 +125,12 @@ class Geolocation():
 
         return closest_fe[0]
 
-    def closest_datacenter(self, target: tuple[float, float]) -> tuple:
+    def position_correction(self, target: tuple[float, float]) -> tuple:
         """
-        Return the closest data-center to the given coordinates.
+        Return the closest possible location to the given coordinates.
 
         @param target: Target's coordinates.
         """
-        closest_dc = min(self.dc_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1][:2]))
+        closest_possible_dc = min(self.possible_file_locations.items(), key=lambda elem: GeolocationUtils.haversine(target, elem[1][:2]))
 
-        return closest_dc[0]
+        return closest_possible_dc[0]

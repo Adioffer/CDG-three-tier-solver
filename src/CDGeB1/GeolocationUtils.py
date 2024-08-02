@@ -64,6 +64,7 @@ class GeolocationUtils():
                  frontend_continents,
                  file_locations,
                  datacenter_locations,
+                 possible_file_locations,
                  # Optionals:
                  closets_probe_to_frontends=None,
                  closest_file_for_frontend=None,
@@ -75,11 +76,12 @@ class GeolocationUtils():
         self.frontend_locations = frontend_locations
         self.frontend_continents = frontend_continents
         self.file_locations = file_locations
+        self.datacenter_locations = datacenter_locations
+        self.possible_file_locations = possible_file_locations
         self.closets_probe_to_frontends = closets_probe_to_frontends
         self.closest_file_for_frontend = closest_file_for_frontend
         self.csp_delays = csp_delays
         self.csp_distances = csp_distances
-        self.datacenter_locations = datacenter_locations
 
     def build_distance_map(self):
         distances = dict()
