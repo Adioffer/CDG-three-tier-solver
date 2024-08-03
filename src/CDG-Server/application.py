@@ -46,6 +46,11 @@ def upload_files():
         if not (file1 and file2 and file3 and file4 and file5):
             return 'Missing files. Please ensure all three files are uploaded.'
 
+        method = request.form['method']
+
+        if method not in ['subtraction', 'optimizer']:
+            return 'Invalid method. Please select either Subtraction or Optimizer.'
+
         # Make new folder with uniquely generated name inside session directory
         session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
 
@@ -70,7 +75,7 @@ def upload_files():
         with open(temp_output_path, 'w') as f:
             sys.stdout = f
             try:
-                CDG_main(input_path, output_path)
+                CDG_main(input_path, output_path, method)
             finally:
                 # Reset sys.stdout to its original value
                 sys.stdout = original_stdout
@@ -112,6 +117,11 @@ def rest_api() -> str:
     if not (file1 and file2 and file3 and file4 and file5):
         return 'Missing files. Please ensure all three files are uploaded.'
 
+    method = request.form['method']
+
+    if method not in ['subtraction', 'optimizer']:
+        return 'Invalid method. Please select either Subtraction or Optimizer.'
+
     domain_name = request.headers.get('Host')
     if domain_name is None:
         return 'Invalid request. Host header is expected.'
@@ -142,7 +152,7 @@ def rest_api() -> str:
     with open(temp_output_path, 'w') as f:
         sys.stdout = f
         try:
-            CDG_main(input_path, output_path)
+            CDG_main(input_path, output_path, method)
         finally:
             # Reset sys.stdout to its original value
             sys.stdout = original_stdout
@@ -156,7 +166,6 @@ def rest_api() -> str:
         for file in files:
             file_path = os.path.join(root, file)
             arcname = os.path.relpath(file_path, start=os.path.dirname(SESSIONS_DIR))
-            print("file", file, "file_path", file_path, "arcname", arcname)
             outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions',
                                                                                                         '/GetFile')
     for root, _, files in os.walk(input_path):

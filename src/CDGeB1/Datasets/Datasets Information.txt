@@ -1,0 +1,25 @@
+DS-B1 (BGU, 15.08.23) - The setup included 14 GCP Compute Engine in-
+stances as probe clients, 17 AWS EC2 instances as front-end
+servers, and 17 AWS S3 buckets with target files.
+
+
+DS-F1 (Fujitsu, 16.02.24) - The setup included 11 Azure Virtual Machines (VM s)
+as probe clients, 11 AWS API Gateway instances as front-end
+servers, and 11 AWS S3 buckets with target files.
+
+
+DS-F2 (Fujitsu, 04.03.24) - The setup included 14 Azure VM s as probe clients,
+19 AWS API Gateway instances as front-end servers, and 19
+AWS S3 buckets with target files.
+
+
+DS-F3 (Fujitsu, 05.07.24) - The setup included 19 AWS EC2 instances as probe
+clients, 19 AWS API Gateway instances as front-end servers,
+and 19 AWS S3 buckets with target files.
+
+
+DS-F4 (Fujitsu, 08.07.24) - The setup included 19 AWS EC2 instances as probe
+clients, 19 AWS API Gateway instances as front-end servers,
+and 19 AWS S3 buckets with target files. This setup is similar
+to DS-F3, but the measurements were conducted at different
+times.
