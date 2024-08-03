@@ -1,245 +1,120 @@
 import numpy as np
-from CDGeB1.common import Continent
-import warnings
+from scipy.optimize import minimize
+from CDGeB1.data_classes import Continent, FrontEnd  # for content-aware
+from CDGeB1.CloudServiceUtils import haversine
 
-warnings.filterwarnings("ignore", "divide by zero encountered in scalar divide", category=RuntimeWarning)
 
-
-class GeolocationUtils():
-    """
-    This class is used before geolocation a target.
-    It contains some useful methods.
-    """
-
-    @classmethod
-    def haversine(cls, coord1, coord2):
+class MultilaterationUtils:
+    def __init__(self, frontend_servers: dict,
+                 csp_general_rate: float = None, csp_rates: dict = None):
         """
-        Computes Haversine distance between two given coordinates.
-        """
-        lat1, lon1 = np.radians(coord1)
-        lat2, lon2 = np.radians(coord2)
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
-        distance = 6371.0 * c  # Radius of Earth in kilometers
-
-        return distance
-
-    @classmethod
-    def pretty_print_rates(cls, rates):
-        """
-        Uses Rich to pretty-print the rates between each continent.
-
-        @param rates: Output of evaluate_csp_rates.
-        """
-        from rich.console import Console
-        from rich.table import Table
-
-        # Extract unique row headers and column headers
-        rows = sorted(set(str(key[0]) for key in rates))
-        columns = sorted(set(str(key[1]) for key in rates))
-
-        # Create a Rich table
-        table = Table(title="Transmission Rates (km/s) within CSP Network")
-
-        # Add the columns to the table, first column for row headers
-        table.add_column("", justify="right", style="cyan", no_wrap=True)
-        for column in columns:
-            table.add_column(column, justify="center")
-
-        # Add rows and their corresponding data to the table
-        for row in rows:
-            row_data = [str(rates.get((row, column), "")) for column in columns]
-            table.add_row(row, *row_data)
-
-        # Print the table
-        console = Console()
-        console.print(table)
-
-    def __init__(self,
-                 file_frontend_mapping,
-                 probe_locations,
-                 frontend_locations,
-                 frontend_continents,
-                 file_locations,
-                 datacenter_locations,
-                 possible_file_locations,
-                 # Optionals:
-                 closets_probe_to_frontends=None,
-                 closest_file_for_frontend=None,
-                 csp_delays=None,
-                 csp_distances=None
-                 ):
-        self.file_frontend_mapping = file_frontend_mapping
-        self.probe_locations = probe_locations
-        self.frontend_locations = frontend_locations
-        self.frontend_continents = frontend_continents
-        self.file_locations = file_locations
-        self.datacenter_locations = datacenter_locations
-        self.possible_file_locations = possible_file_locations
-        self.closets_probe_to_frontends = closets_probe_to_frontends
-        self.closest_file_for_frontend = closest_file_for_frontend
-        self.csp_delays = csp_delays
-        self.csp_distances = csp_distances
-
-    def build_distance_map(self):
-        distances = dict()
-        for frontend, frontend_location in self.frontend_locations.items():
-            for filename, file_location in self.file_locations.items():
-                distances[(frontend, filename)] = self.haversine(frontend_location[:2], file_location[:2])
-        return distances
-
-    def determine_closest_probes(self):
-        """
-        Determine the closest probe to each front-end server.
-        """
-        closest_probes = dict()
-        for frontend in self.frontend_locations:
-            closest_probes[frontend] = min(self.probe_locations,
-                                           key=lambda probe: self.haversine(self.frontend_locations[frontend][:2],
-                                                                            self.probe_locations[probe][:2]))
-
-        return closest_probes
-
-    def determine_closest_files(self, measurements_to_all_targets):
-        """
-        Determine the file to be located within the same DC as each front-end server.
-        Assuming they have the least rtt between them. 
-        """
-        closest_file_for_frontend = dict()
-        for frontend in self.frontend_locations:
-            closest_file_measurement = min(measurements_to_all_targets.items(),
-                                           # pair = (key=(probe_name,frontend_name,filename), value=min_rtt)
-                                           key=lambda pair: pair[1] if \
-                                               # front-end == frontent
-                                           pair[0][1] == frontend and \
-                                           # probe = closest to frontend
-                                           pair[0][0] == self.closets_probe_to_frontends[frontend]
-                                           else float('inf'))
-            closest_file_for_frontend[frontend] = closest_file_measurement[0][2]
-
-        # pretty print closest_file_for_frontend, in each row:
-        print("Closest file for each front-end server: \n",
-              '\n'.join([f'{k}:\t{v}' for k, v in closest_file_for_frontend.items()]))
-
-        return closest_file_for_frontend
-
-    def compute_csp_delays_intra_dc_poc(self, measurements_to_all_targets):
-        intra_dc = {"cdgeb-server-01": 0.013363,
-                    "cdgeb-server-02": 0.011441,
-                    "cdgeb-server-03": 0.018753,
-                    "cdgeb-server-04": 0.019172,
-                    "cdgeb-server-05": 0.012989,
-                    "cdgeb-server-06": 0.011617,
-                    "cdgeb-server-07": 0.012338,
-                    "cdgeb-server-08": 0.012499,
-                    "cdgeb-server-09": 0.014998,
-                    "cdgeb-server-10": 0.01144,
-                    "cdgeb-server-11": 0.011053,
-                    "cdgeb-server-12": 0.012879,
-                    "cdgeb-server-13": 0.013707,
-                    "cdgeb-server-14": 0.012099,
-                    "cdgeb-server-15": 0.013234,
-                    "cdgeb-server-16": 0.011779,
-                    "cdgeb-server-17": 0.013305,
-                    }
-
-        rtts_within_csp = dict()
-        for frontend in self.frontend_locations:
-            closest_file = self.closest_file_for_frontend[frontend]
-            closest_probe = self.closets_probe_to_frontends[frontend]
-
-            for filename in self.file_locations:
-                rtts_within_csp[(frontend, filename)] = \
-                    measurements_to_all_targets[(closest_probe, frontend, filename)] - \
-                    measurements_to_all_targets[(closest_probe, frontend, closest_file)] \
-                    + intra_dc[frontend]
-
-                if rtts_within_csp[(frontend, filename)] < 0:
-                    print("ERROR: Negative RTT!")
-                    # rtts_within_csp[(frontend, filename)] = 0 # Avoid negative values
-
-                if measurements_to_all_targets[(closest_probe, frontend, filename)] - \
-                        measurements_to_all_targets[(closest_probe, frontend, closest_file)] < 0:
-                    print("ERROR: Negative RTT for RTT2-RTT1!")
-
-        return rtts_within_csp
-
-    def compute_csp_delays(self, measurements_to_all_targets):
-        """
-        Compute the round-trip times of the second hop (front-end to file)
+        @param frontend_servers: dict of front-end names and their (lat, long) coordinates.
+        @param csp_general_rate: a float value of transmission rate within the CSP's network. Optional.
+        @param csp_rates: dict of (Continent, Continent) and their corresponding transmission rate. Optional (if csp_general_rate is supplied).
+        @param frontend_continents: a dict mapping between front-end servers and their Continent. Required if csp_rates supplied.
         """
 
-        # self.compute_csp_delays_intra_dc_poc(measurements_to_all_targets)
+        self.frontend_server = frontend_servers
+        self.csp_general_rate = csp_general_rate
+        self.csp_rates = csp_rates
 
-        rtts_within_csp = dict()
-        for frontend in self.frontend_locations:
-            closest_file = self.closest_file_for_frontend[frontend]
-            closest_probe = self.closets_probe_to_frontends[frontend]
-
-            for filename in self.file_locations:
-                rtts_within_csp[(frontend, filename)] = \
-                    measurements_to_all_targets[(closest_probe, frontend, filename)] - \
-                    measurements_to_all_targets[(closest_probe, frontend, closest_file)]
-
-        return rtts_within_csp
-
-    def compute_csp_delays_test(self, measurements_1party, measurements_3party, frontend_3party, filenames):
-        rtts_within_csp = dict()
-        for frontend_3party in frontend_3party:
-            closest_file_in_1party = self.closest_file_for_frontend[frontend_3party]
-            closest_probe_in_1party = self.closets_probe_to_frontends[frontend_3party]
-
-            for filename in filenames:
-                rtts_within_csp[(frontend_3party, filename)] = \
-                    measurements_3party[(closest_probe_in_1party, frontend_3party, filename)] - \
-                    measurements_1party[(closest_probe_in_1party, frontend_3party, closest_file_in_1party)]
-
-        return rtts_within_csp
-
-    def _evaluate_rates_inner(self, continent_a=None, continent_b=None):
-        """ Evaluate the communication rates within CSP network.
-        Given every frontent->file delay and distance.
-        If continents are not specified - all continents will be considered.
+    def delay_to_distance_continent_aware(self, delay: float, src_continent: Continent,
+                                          target_assumed_continent: Continent) -> float:
+        """
+        Converts measured single-direction delay of data within CSP backbone to distances
+        according to the transmission rate computed from advanced. (See front-file scatterplot)
         
-        return: rate [km/s]
+        @param delay: single-direction delay in seconds
+        @param src_continent: continent of the frontend server
+        @param target_assumed_continent: assumed continent of the file, which impacts the rate constansts
+        return: distance in kilometers
         """
 
-        Xs, Ys = list(), list()
-        for frontend in self.frontend_locations:
-            for filename in self.file_locations:
-                # Filter the relevant measurements
-                if continent_a and continent_b:
-                    if continent_a != self.frontend_continents[frontend] or \
-                            continent_b != self.datacenter_locations[self.file_frontend_mapping[filename]][2]:
-                        continue
+        return delay * self.csp_rates[(src_continent, target_assumed_continent)]
 
-                distance = self.csp_distances[(frontend, filename)]
-                delay = self.csp_delays[(frontend, filename)]
-
-                Xs.append(distance)
-                Ys.append(delay)
-
-        slope = np.linalg.lstsq(np.array(Xs)[:, np.newaxis], np.array(Ys), rcond=None)[0][0]
-
-        return round(1 / slope, 2)
-
-    def evaluate_csp_general_rate(self):
+    def delay_to_distance(self, delay: float) -> float:
         """
-        Computes the general transmission rate within the CSP's network.
+        Converts measured single-direction delay of data within CSP backbone to distances
+        according to the transmission rate computed from advanced. (See front-file scatterplot)
+        
+        @param delay: single-direction delay in seconds
+        return: distance in kilometers
         """
-        general_rate = self._evaluate_rates_inner()
-        return general_rate
 
-    def evaluate_csp_rates(self):
-        """
-        Computes the transmission rates within the CSP's network, considering the continents.
-        """
-        rates = dict()
-        for continent_a in Continent:
-            for continent_b in Continent:
-                rate = self._evaluate_rates_inner(continent_a, continent_b)
-                rates[(continent_a, continent_b)] = rate
+        return delay * self.csp_general_rate
 
-        return rates
+    def _geolocate_using_scipy(self, distances: dict[FrontEnd, float]):
+        """
+        This method uses scipy's minimize to geolocate the target.
+        Co-Author: Daniel
+        """
+
+        def normalize_coordinates(coord_unnormalized):
+            """
+            Normalizes a given coordinates to the ranges: lat = [-90, 90], lon = [-180, 180].
+            Please read the note in multilateraion.
+            """
+            lat1, lon1 = coord_unnormalized[0], coord_unnormalized[1]
+            lat2 = (lat1 + 90) % 180 - 90
+            lon2 = (lon1 + 180) % 360 - 180
+            return (lat2, lon2)
+
+        def loss_function(current_guess, known_distances, positions):
+            distances_from_guess = np.array([haversine(current_guess, probe) for probe in positions])
+            return np.sum((distances_from_guess - known_distances) ** 2)
+
+        def multilateration(positions, distances):
+            # initial_guess = np.mean(positions, axis=0)
+            initial_guess = positions[np.argmin(distances)]
+            # Note: reverted as for some reason many targets where estimated to the bouneries themselves (e.g. [-90,-180]),
+            # whereas the estimation without the bounderies was correct.
+            # bounds = [(-90, 90), (-180, 180)] # lat, lon boundaries
+            result = minimize(loss_function, initial_guess, args=(distances, positions),
+                              #   bounds=bounds,
+                              method='L-BFGS-B', options={'disp': False})
+            return result.x
+
+        distances_from_fes = list(distances.values())
+        feontend_locations = [frontend.coordinates for frontend in distances]
+
+        target = multilateration(np.array(feontend_locations), np.array(distances_from_fes))
+        return normalize_coordinates(target)
+
+    def geolocate_target(self, measurements_to_target: dict[FrontEnd, float]):
+        """
+        Given single-direction delay measurements from multiple front-end servers
+        with known locations to a file, geolocate the file.
+        
+        @param measurements_to_target: dict of front-end names and their *single-direction delays* (not RTT!) to a single target file
+        
+        return: (lat, long) coordinates of the file
+        """
+
+        # assert all(any(frontend.name == frontend_name for frontend in self.frontend_server)
+        #            for frontend_name in measurements_to_target), "Inputs do not match (measurements_to_target, fe_locations)"
+
+        assert all(frontend in self.frontend_server for frontend in
+                   measurements_to_target), "Inputs do not match (measurements_to_target, fe_locations)"
+
+        assumed_closest_frontend = min(measurements_to_target, key=measurements_to_target.get)
+        target_assumed_continent = assumed_closest_frontend.continent
+
+        # Convert time measurements to distances
+        # distances = {fe:self.delay_to_distance(delay) for fe, delay in measurements_to_target.items()}
+        distances = {
+            frontend: self.delay_to_distance_continent_aware(delay, frontend.continent, target_assumed_continent)
+            for frontend, delay in measurements_to_target.items()}
+
+        return self._geolocate_using_scipy(distances)
+
+    def geolocate_target_from_distances(self, distances: dict[FrontEnd, float]):
+        """
+        Similar to geolocate_target, but uses given distances instead of delay measurements.
+        @param distances: dict(frontend: distance)
+        """
+        # assert all(any(frontend.name == frontend_name for frontend in self.frontend_server)
+        #            for frontend_name in distances), "Inputs do not match (distances, fe_locations)"
+        assert all(
+            frontend in self.frontend_server for frontend in distances), "Inputs do not match (distances, fe_locations)"
+
+        return self._geolocate_using_scipy(distances)

@@ -1,16 +1,16 @@
 import os
 import sys
 import csv
-from statistics import mean, median
 import numpy as np
 from rich.console import Console
 from rich.table import Table
-from scipy.optimize import minimize
 
-from CDGeB1.GeolocationUtils import GeolocationUtils
-from CDGeB1.GeolocationCSP import Geolocation
-from CDGeB1.common import Continent
+from CDGeB1.CloudServiceUtils import *
+from CDGeB1.GeolocationUtils import MultilaterationUtils
+from CDGeB1.data_classes import *
 from CDGeB1.plot_map import MapBuilder
+from CDGeB1.parsers import *
+
 import itertools
 import random
 import pickle
@@ -33,267 +33,105 @@ SOLUTION_FILE_ENTRY_LENGTH = 2
 
 COORDINATES_LENGTH = 2
 
-ORIGINAL_METHOD = "original"
-OPTIMIZER_METHOD = "optimizer"
+METHOD_SUBTRACTION = "subtraction"
+METHOD_OPTIMIZATION = "optimizer"
 
 
-def check_files_exist(input_dir):
-    filepath = os.path.join(input_dir, MEASUREMENT_FILE_1PARTY)
-    if not os.path.isfile(filepath):
-        print("Missing file", MEASUREMENT_FILE_1PARTY)
-        return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY)):
-        print("Missing file", SERVERS_DATA_FILE_1PARTY)
-        return False
-    if not os.path.isfile(os.path.join(input_dir, DATACENTERS_FILE)):
-        print("Missing file", DATACENTERS_FILE)
-        return False
-    if not os.path.isfile(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY)):
-        print("Missing file", MEASUREMENT_FILE_3PARTY)
-        return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY)):
-        print("Missing file", SERVERS_DATA_FILE_3PARTY)
-        return False
+def parse_input_files(input_dir, testing_mode=False):
+    datacenters, possible_file_datacenters = parse_datacenters(input_dir)
+
+    probes_1party, frontends_1party, files_1party = parse_servers_1party(input_dir, datacenters)
+    measurements_1party = parse_measurements_1party(input_dir, probes_1party, frontends_1party, files_1party)
+
+    probes_3party, frontends_3party, files_3party = parse_servers_3party(input_dir, datacenters)
+    measurements_3party = parse_measurements_3party(input_dir, probes_3party, frontends_3party, files_3party)
+
+    true_file_datacenter_mapping_3party = None
+    if testing_mode:
+        true_file_datacenter_mapping_3party = parse_solution(input_dir, datacenters, files_3party)
+
+    cdgeb_utils_1party = DatasetUtils1Party(
+        measurements=measurements_1party,
+        datacenters=datacenters,
+        probe_clients=probes_1party,
+        frontend_servers=frontends_1party,
+        data_files=files_1party,
+    )
+
+    cdgeb_utils_3party = DatasetUtils3Party(
+        measurements=measurements_3party,
+        datacenters=datacenters,
+        probe_clients=probes_3party,
+        frontend_servers=frontends_3party,
+        data_files=files_3party,
+        possible_file_datacenters=possible_file_datacenters,
+        solutions=true_file_datacenter_mapping_3party,
+    )
+
+    return cdgeb_utils_1party, cdgeb_utils_3party
+
+
+def validate_input_files(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
+    if method == METHOD_SUBTRACTION:
+        # Each datacenter utilized by 3Party must be present in 1Party
+        if not set(cdgeb_utils_3party.datacenters) <= set(cdgeb_utils_1party.datacenters):
+            print("[ERROR] Datacenters in 3Party not found in 1Party")
+            return False
+
+        # Both 1Party and 3Party must have the same "closest" probe clients
+        if not set(cdgeb_utils_3party.closest_probe_to_frontend.values()) <= set(
+                cdgeb_utils_1party.closest_probe_to_frontend.values()):
+            print("[ERROR] 1Party and 3Party don't share the same closest probe clients")
+            return False
+
+    if testing_mode:
+        # Each file in 3Party must have a solution
+        if not set(cdgeb_utils_3party.data_files) <= set(cdgeb_utils_3party.solutions):
+            print("[ERROR] Some files in 3Party don't have solutions")
+            return False
+
+        # Each file in 3Party must be located in a possible datacenter
+        if not set(cdgeb_utils_3party.solutions.values()) <= set(cdgeb_utils_3party.possible_file_datacenters):
+            print("[ERROR] Some files in 3Party solution don't reside in possible datacenters")
+            return False
+
     return True
 
 
-def aggregateMeasurements(measurements):
-    # return min(measurements)
-    # return mean(measurements)
-    # return median(measurements)
-    return mean(sorted(measurements)[3:-3])
+def learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode=False):
+    # Stage - Evaluate second-hop RTTs and CSP transmission rates
+    if method == METHOD_SUBTRACTION:
+        cdgeb_utils_1party.compute_csp_delays_subtraction()
+        csp_general_rate = cdgeb_utils_1party.evaluate_csp_general_rate()
+        csp_rates = cdgeb_utils_1party.evaluate_csp_rates()
 
+        # print rates
+        print()
+        pretty_print_rates(csp_rates)
+        print("Rates within CSP (All measuremenets):", csp_general_rate)
+        print()
 
-def parse_datasets_1party(input_dir):
-    # Load measurements from CSV
-    measurements_1party = dict()
-    with open(os.path.join(input_dir, MEASUREMENT_FILE_1PARTY), 'r') as f:
-        csv_reader = csv.reader(f)
-        for row in csv_reader:
-            if len(row) < MEASUREMENT_FILE_ENTRY_LENGTH:
-                print(f"Skipping incomplete row in file {MEASUREMENT_FILE_1PARTY}: {row}")
-                continue
-            probe, frontend, file = row[:3]
-            measurements = [float(x) for x in row[3:24]]
-            measurements_1party[(probe, frontend, file)] = aggregateMeasurements(measurements)
+        cdgeb_utils_3party.csp_rates = csp_rates
+        cdgeb_utils_3party.compute_csp_delays_subtraction(cdgeb_utils_1party)
 
-    probes_set = set([key[MEASUREMENT_PROBES] for key in measurements_1party])
-    frontends_set = set([key[MEASUREMENT_FRONTENDS] for key in measurements_1party])
-    files_set = set([key[MEASUREMENT_FILES] for key in measurements_1party])
+    elif method == METHOD_OPTIMIZATION:
+        cdgeb_utils_1party.compute_csp_delays_optimizer()
+        csp_general_rate = cdgeb_utils_1party.evaluate_csp_general_rate()
+        csp_rates = cdgeb_utils_1party.evaluate_csp_rates()
 
-    # Check for common elements
-    if len(probes_set.intersection(frontends_set)) > 0:
-        print("Probes and frontends have common elements")
-        return False
-    if len(probes_set.intersection(files_set)) > 0:
-        print("Probes and files have common elements")
-        return False
-    if len(frontends_set.intersection(files_set)) > 0:
-        print("Frontends and files have common elements")
-        return False
+        # print rates
+        print()
+        pretty_print_rates(csp_rates)
+        print("Rates within CSP (All measuremenets):", csp_general_rate)
+        print()
 
-    # Load servers data
-    server_locations = dict()
-    file_datacenter_mapping = dict()
-    server_datacenter_mapping = dict()
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY), 'r') as f:
-        csv_reader = csv.reader(f)
-        for row in csv_reader:
-            if len(row) == 0:
-                # Skip empty lines
-                continue
-            if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
-                name, datacenter = row[:2]
-                if name in files_set:
-                    file_datacenter_mapping[name] = datacenter
-                elif name in frontends_set:
-                    server_datacenter_mapping[name] = datacenter
-            else:
-                servername, lat, lon, continent = row[:4]
-                server_locations[servername] = (float(lat), float(lon), Continent(continent))
-
-    datacenter_locations = dict()
-    possible_file_locations = dict()
-
-    with open(os.path.join(input_dir, DATACENTERS_FILE), 'r') as f:
-        csv_reader = csv.reader(f)
-        for row in csv_reader:
-            if len(row) < DATACENTER_FILE_ENTRY_LENGTH:
-                print(f"Skipping incomplete row in file {DATACENTERS_FILE}: {row}")
-                continue
-            name, lat, lon, continent, only_learn = row[:5]
-            datacenter_locations[name] = (float(lat), float(lon), continent)
-            if only_learn and only_learn == 'learn_only':
-                print("Found learn_only:", name)
-                pass
-            else:
-                possible_file_locations[name] = (float(lat), float(lon), continent)
-                print("Possible location:", name)
-
-    # Check if all probes, frontends and files are in the servers list
-    if not all(probe in server_locations for probe in probes_set):
-        print("Some probes are not in the servers list")
-        return False
-    if not all(frontend in server_datacenter_mapping for frontend in frontends_set):
-        print("Some frontends are not in the servers list")
-        return False
-    if not all(file in file_datacenter_mapping for file in files_set):
-        print("Some files are not in the servers list")
-        return False
-
-    # Create dictionaries for locations and continents
-    def sortDict(d):
-        return dict(sorted(d.items(), key=lambda item: item[0]))
-
-    def find_frontend_location(frontend):
-        datacenter = server_datacenter_mapping[frontend]
-        return datacenter_locations[datacenter]
-
-    def find_file_location(file):
-        datacenter = file_datacenter_mapping[file]
-        return datacenter_locations[datacenter]
-
-    probe_locations = sortDict({probe: server_locations[probe][:COORDINATES_LENGTH] for probe in probes_set})
-    frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
-    frontend_continents = sortDict(
-        {frontend: find_frontend_location(frontend)[COORDINATES_LENGTH] for frontend in frontends_set})
-    file_locations = sortDict({file: find_file_location(file) for file in files_set})
-
-    cdgeb_geolocation_utils = GeolocationUtils(
-        file_frontend_mapping=file_datacenter_mapping,
-        probe_locations=probe_locations,
-        frontend_locations=frontend_locations,
-        frontend_continents=frontend_continents,
-        file_locations=file_locations,
-        datacenter_locations=datacenter_locations,
-        possible_file_locations=possible_file_locations
-    )
-
-    return measurements_1party, probe_locations, frontend_locations, frontend_continents, \
-           cdgeb_geolocation_utils
-
-
-def parse_datasets_3party(input_dir, datacenter_location):
-    # Load measurements from CSV
-    measurements_3party = dict()
-    with open(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY), 'r') as f:
-        csv_reader = csv.reader(f)
-        for row in csv_reader:
-            if len(row) < MEASUREMENT_FILE_ENTRY_LENGTH:
-                print(f"Skipping incomplete row in file {DATACENTERS_FILE}: {row}")
-                continue
-            probe, frontend, file = row[:3]
-            measurements = [float(x) for x in row[3:24]]
-            measurements_3party[(probe, frontend, file)] = aggregateMeasurements(measurements)
-
-    probes_set = set([key[MEASUREMENT_PROBES] for key in measurements_3party])
-    frontends_set = set([key[MEASUREMENT_FRONTENDS] for key in measurements_3party])
-    files_set = set([key[MEASUREMENT_FILES] for key in measurements_3party])
-    # Load servers data
-    server_locations = dict()
-    server_datacenter_mapping = dict()
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY), 'r') as f:
-        csv_reader = csv.reader(f)
-        for row in csv_reader:
-            if len(row) == 0:
-                # Skip empty lines
-                continue
-            if len(row) < SERVER_FILE_FULL_ENTRY_LENGTH:
-                name, datacenter = row[:2]
-                if name in frontends_set:
-                    server_datacenter_mapping[name] = datacenter
-            else:
-                servername, lat, lon, continent = row[:4]
-                server_locations[servername] = (float(lat), float(lon), Continent(continent))
-
-    # Check if all probes, frontends and files are in the servers list
-    if not all(probe in server_locations for probe in probes_set):
-        print("Some probes are not in the servers list")
-        return False
-    if not all(frontend in frontends_set for frontend in frontends_set):
-        print("Some frontends are not in the servers list")
-        return False
-    if not all(file in files_set for file in files_set):
-        print("Some files are not in the servers list")
-        return False
-
-    # Create dictionaries for locations and continents
-    def sortDict(d):
-        return dict(sorted(d.items(), key=lambda item: item[0]))
-
-    def find_frontend_location(frontend):
-        datacenter = server_datacenter_mapping[frontend]
-        return datacenter_location[datacenter]
-
-    frontend_locations = sortDict({frontend: find_frontend_location(frontend) for frontend in frontends_set})
-
-    file_locations = None
-    file_datacenter_mapping = None
-    if os.path.isfile(os.path.join(input_dir, SOLUTION_DATA_FILE)):
-        file_datacenter_mapping = dict()
-        with open(os.path.join(input_dir, SOLUTION_DATA_FILE), 'r') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) >= SOLUTION_FILE_ENTRY_LENGTH:
-                    file, datacenter = row[:2]
-                    file_datacenter_mapping[file] = datacenter
-        file_locations = {file: datacenter_location[datacenter] for file, datacenter in file_datacenter_mapping.items()}
-
-    return measurements_3party, frontend_locations, files_set, file_locations, file_datacenter_mapping
-
-
-def learn_from_data(measurements_1party, cdgeb_geolocation_utils, measurements_3party, frontend_locations_3party,
-                    filenames_3party, method):
-    # Stage 1 - Compute delays within CSP
-
-    distance_map = cdgeb_geolocation_utils.build_distance_map()
-    cdgeb_geolocation_utils.csp_distances = distance_map
-
-    closets_probe_to_frontends = cdgeb_geolocation_utils.determine_closest_probes()
-    cdgeb_geolocation_utils.closets_probe_to_frontends = closets_probe_to_frontends
-
-    closest_file_for_frontend = cdgeb_geolocation_utils.determine_closest_files(measurements_1party)
-    cdgeb_geolocation_utils.closest_file_for_frontend = closest_file_for_frontend
-    if method == ORIGINAL_METHOD:
-        rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays(measurements_1party)
+        cdgeb_utils_3party.csp_rates = csp_rates
+        cdgeb_utils_3party.compute_csp_delays_optimizer()
     else:
-        rtts_within_csp = compute_csp_delays_optimizer(
-            cdgeb_geolocation_utils, measurements_1party, cdgeb_geolocation_utils.frontend_locations, filenames_3party)
-    csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
-    cdgeb_geolocation_utils.csp_delays = csp_delays
-
-    csp_general_rate = cdgeb_geolocation_utils.evaluate_csp_general_rate()
-    csp_rates = cdgeb_geolocation_utils.evaluate_csp_rates()
-
-    if method == ORIGINAL_METHOD:
-        rtts_within_csp = cdgeb_geolocation_utils.compute_csp_delays_test(measurements_1party, measurements_3party,
-                                                                          frontend_locations_3party, filenames_3party)
-    elif method == OPTIMIZER_METHOD:
-        rtts_within_csp = compute_csp_delays_optimizer(
-            cdgeb_geolocation_utils, measurements_3party, frontend_locations_3party, filenames_3party)
-
-    else:
-        print('ERROR: method option is not valid')
+        print("[ERROR] Invalid method:", method)
         return
 
-    csp_delays = {k: v / 2 for k, v in rtts_within_csp.items()}
-    cdgeb_geolocation_utils.csp_delays = csp_delays
-
-    datacenter_frontend_mapping = {datacenter: frontend for datacenter, datacenter_loc in
-                                   cdgeb_geolocation_utils.datacenter_locations.items() for frontend, frontend_loc in
-                                   cdgeb_geolocation_utils.frontend_locations.items() if datacenter_loc == frontend_loc}
-
-    # Save results
-    # TODO
-
-    # Stage 2 - Compute transmission rates within CSP
-
-    # Print results
-    GeolocationUtils.pretty_print_rates(csp_rates)
-    print("Rates within CSP (All measuremenets):", csp_general_rate)
-    print()
-
-    return csp_delays, csp_general_rate, csp_rates, datacenter_frontend_mapping
+    return csp_rates
 
 
 def are_tables_equal(table1, table2):
@@ -314,12 +152,8 @@ def are_tables_equal(table1, table2):
     return True
 
 
-def geolocate_from_data(cdgeb_utils,  # used for geolocation
-                        # Used for building geolocation setup
-                        csp_delays, csp_rates,  # used for geolocation
-                        Output_dir, datacenter_frontend_mapping, filenames, file_locations, file_datacenter_mapping
-                        ):
-    if file_locations:
+def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
+    if testing_mode:
         # Create a Rich table for results
         table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
 
@@ -334,167 +168,122 @@ def geolocate_from_data(cdgeb_utils,  # used for geolocation
         table.add_column("File Name", justify="center")
         table.add_column("Assumed Datacenter", justify="center")
 
-    # Stages 3-5 - Geolocation
+    # Stages - Geolocation
     # Create map of all geolocated targets
-    map_all_targets = MapBuilder("all_targets", cdgeb_utils.probe_locations, cdgeb_utils.frontend_locations)
+    map_all_targets = MapBuilder("all_targets", cdgeb_utils_3party.probe_clients, cdgeb_utils_3party.datacenters)
     map_all_targets.add_datacenter()
 
     # Initialize a geolocator
-
-    csp_geolocator = Geolocation(cdgeb_utils.frontend_locations, cdgeb_utils.possible_file_locations, csp_rates=csp_rates, frontend_continents=cdgeb_utils.frontend_continents)
+    if method == METHOD_SUBTRACTION or method == METHOD_OPTIMIZATION:
+        csp_geolocator = MultilaterationUtils(cdgeb_utils_3party.frontend_servers,
+                                              csp_rates=cdgeb_utils_3party.csp_rates)
+    else:
+        print("[ERROR] Invalid method:", method)
+        return
 
     errors = []
-    for filename in filenames:
-        # Geolocate current file using measurements from other frontends
-        delays_from_server = {frontend_name: csp_delays[(frontend_name, filename_d)] for (frontend_name, filename_d) in
-                              csp_delays.keys() if filename_d == filename}
+    for target_file in cdgeb_utils_3party.data_files:
 
-        if file_datacenter_mapping:
-            true_datacenter = file_datacenter_mapping[filename]
-            true_frontend = datacenter_frontend_mapping[true_datacenter]
-            delays_from_server.pop(true_frontend)
+        if method == METHOD_SUBTRACTION or method == METHOD_OPTIMIZATION:
+            # Prepare delays from front-end servers for the target file.
+            # Remove delays from front-end server in the same datacenter.
+            delays_from_server = {k[0]: v for (k, v) in cdgeb_utils_3party.csp_delays.items()
+                                  if k[1] == target_file and k[0].datacenter != k[1].datacenter}
+            if testing_mode:
+                frontend_in_same_datacenter = [fe for fe in cdgeb_utils_3party.frontend_servers
+                                               if fe.datacenter == cdgeb_utils_3party.solutions[target_file]][0]
+                delays_from_server.pop(frontend_in_same_datacenter)
 
-        # Geolocation
-        estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+            # Geolocation
+            estimated_location = csp_geolocator.geolocate_target(delays_from_server)
 
-        # Second-time geolocation - distance
-        # tmp_frontends = list(delays_from_server.keys()) # Workaround
-        # for frontend_name in tmp_frontends:
-        #     if GeolocationUtils.haversine(frontend_locations[frontend_name], estimated_location) > 3000:
-        #         delays_from_server.pop(frontend_name)
-        # if len(delays_from_server) < 3:
-        #     print(f"Skipping double-geolocation for {filename} due to lack of measurements")
-        # else:
-        #     estimated_location = csp_geolocator.geolocate_target(delays_from_server)
+            closest_datacenter = cdgeb_utils_3party.position_correction(estimated_location)
 
-        # Second-time geolocation - k-nearest
-        # tmp_frontends = list(delays_from_server.keys()) # Workaround
-        # tmp_frontends.sort(key=lambda x: GeolocationUtils.haversine(frontend_locations[x], estimated_location))
-        # k = 6
-        # for frontend_name in tmp_frontends[k:]:
-        #     delays_from_server.pop(frontend_name)
-        # estimated_location = csp_geolocator.geolocate_target(delays_from_server)
-
-        closest_datacenter = csp_geolocator.position_correction(estimated_location)
+        else:
+            print("[ERROR] Invalid method:", method)
+            return
 
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{filename}_estimated', cdgeb_utils.probe_locations,
-                                       cdgeb_utils.datacenter_locations)
+        map_single_target = MapBuilder(f'{target_file.name}_estimated', cdgeb_utils_3party.probe_clients,
+                                       cdgeb_utils_3party.datacenters)
         map_single_target.add_datacenter()
-        map_single_target.add_point(estimated_location, f'estimated-location-of-{filename}')
-        if file_locations:
-            map_single_target.add_circle(estimated_location,
-                                         GeolocationUtils.haversine(estimated_location,
-                                                                    file_locations[filename][:COORDINATES_LENGTH]))
-            map_single_target.add_dashed_line(estimated_location, file_locations[filename][:COORDINATES_LENGTH])
-        map_single_target.add_line(estimated_location,
-                                   cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
-        map_single_target.save_map(Output_dir)
+        map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}')
 
-        if file_datacenter_mapping:
+        true_file_datacenter = cdgeb_utils_3party.solutions[target_file] \
+            if testing_mode else None
+        true_file_coordinates = true_file_datacenter.coordinates \
+            if testing_mode else None
+
+        if testing_mode:
+            map_single_target.add_circle(estimated_location,
+                                         haversine(estimated_location, true_file_coordinates))
+            map_single_target.add_dashed_line(estimated_location, true_file_coordinates)
+
+        map_single_target.add_line(estimated_location, closest_datacenter.coordinates)
+        map_single_target.save_map(output_dir)
+
+        if testing_mode:
             # Calculate errors
-            geolocation_error = GeolocationUtils.haversine(
-                cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH], estimated_location)
-            closest_error = GeolocationUtils.haversine(
-                cdgeb_utils.datacenter_locations[true_datacenter][:COORDINATES_LENGTH],
-                cdgeb_utils.datacenter_locations[closest_datacenter][:COORDINATES_LENGTH])
+            geolocation_error = haversine(estimated_location, true_file_coordinates)
+            closest_error = haversine(closest_datacenter.coordinates, true_file_coordinates)
 
             errors.append((geolocation_error, closest_error))
-            table.add_row(filename, true_datacenter,
-                          str(round(geolocation_error, 2)), str(closest_datacenter == true_datacenter),
+            table.add_row(target_file.name, true_file_datacenter.name,
+                          str(round(geolocation_error, 2)), str(closest_datacenter.name == true_file_datacenter.name),
                           str(round(closest_error, 2))
                           )
 
-            map_all_targets.add_point(estimated_location, f'estimated-location-of-{true_datacenter}',
-                                      color="green" if closest_datacenter == true_datacenter else "red")
+            map_all_targets.add_point(estimated_location, f'estimated-location-of-{target_file.name}',
+                                      color="green" if closest_datacenter.name == true_file_datacenter.name else "red")
         else:
-            table.add_row(filename, closest_datacenter)
+            table.add_row(target_file.name, closest_datacenter.name)
+
+            map_all_targets.add_point(estimated_location, f'estimated-location-of-{target_file.name}',
+                                      color="green")
+            map_all_targets.add_dashed_line(estimated_location, closest_datacenter.coordinates)
 
     # Print the table
     console = Console()
     console.print(table)
-    output_table_path = os.path.join(Output_dir, 'table.pkl')
+    output_table_path = os.path.join(output_dir, 'table.pkl')
     # with open(output_table_path, 'wb') as f:
     #     pickle.dump(table, f)
     # with open(output_table_path, 'rb') as f:
     #     test_table = pickle.load(f)
-    if file_locations:
-        rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
-        print("Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
-        rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
-        print("Closest Geolocation Error (RMSE): ", round(rmse_error, 2), "[km]")
+    if testing_mode:
+        final_mean_error = np.mean([err[1] for err in errors])
+        final_max_error = np.max([err[1] for err in errors])
+        final_rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
+        print("Final-Geolocation Mean Error:\t", round(final_mean_error, 2), "\t[km]")
+        print("Final-Geolocation Max Error:\t", round(final_max_error, 2), "\t[km]")
+        print("Final-Geolocation RMSE Error:\t", round(final_rmse_error, 2), "\t[km]")
+        print()
+
+        multilateration_mean_error = np.mean([err[0] for err in errors])
+        multilateration_max_error = np.max([err[0] for err in errors])
+        multilateration_rmse_error = np.sqrt(np.mean(np.square([err[0] for err in errors])))
+        print("Multilateration Mean Error:\t", round(multilateration_mean_error, 2), "\t[km]")
+        print("Multilateration Max Error:\t", round(multilateration_max_error, 2), "\t[km]")
+        print("Multilateration RMSE Error:\t", round(multilateration_rmse_error, 2), "\t[km]")
         print()
     # print(
     #     f'The table is {"" if are_tables_equal(test_table, table) else "not"}similar to the original table before the change!!')
 
     # Save the map
-    map_all_targets.save_map(Output_dir)
-
-
-def compute_csp_delays_optimizer(cdgeb_utils_1party, measurements_3party, frontend_locations_3party,
-                                 files_set):
-    measurements_reduced = {k: v for k, v in measurements_3party.items() if k[0] == cdgeb_utils_1party.closets_probe_to_frontends[k[1]]}
-
-    probes = list(cdgeb_utils_1party.probe_locations.keys())
-    servers = list(cdgeb_utils_1party.frontend_locations.keys())
-    files = list(files_set)
-
-    num_probes = len(probes)
-    num_servers = len(servers)
-    num_files = len(files)
-
-    # Initial guess for the delays
-    initial_guess = np.zeros(num_probes * num_servers + num_servers * num_files)
-    param_bounds = (
-        [(0, None) for _ in range(len(initial_guess))]
-    )
-
-    def loss(x):
-        probe_server_delays = x[:num_probes * num_servers].reshape((num_probes, num_servers))
-        server_file_delays = x[num_probes * num_servers:].reshape((num_servers, num_files))
-
-        total_loss = 0
-        for measure in measurements_reduced:
-            probe, server, file = measure
-            measured_delay = measurements_reduced[measure]
-            p = probes.index(probe)
-            s = servers.index(server)
-            f = files.index(file)
-            estimated_delay = probe_server_delays[p, s] + server_file_delays[s, f]
-            total_loss += (measured_delay - estimated_delay) ** 2
-        return total_loss
-
-    result = minimize(loss, initial_guess, method='L-BFGS-B', bounds=param_bounds)
-
-    optimized_delays = result.x
-    probe_server_delays = optimized_delays[:num_probes * num_servers].reshape((num_probes, num_servers))
-    server_file_delays = optimized_delays[num_probes * num_servers:].reshape((num_servers, num_files))
-
-    rtts_within_csp = {(servers[i], files[j]): server_file_delays[i][j] for i in range(len(server_file_delays)) for j in
-                       range(len(server_file_delays[i]))}
-
-    return rtts_within_csp
+    map_all_targets.save_map(output_dir)
 
 
 def geolocation_main(input_dir, output_dir, method):
-    # extra caution is needed here ;)
-    measurements_1party, probe_locations_1party, frontend_locations_1party, frontend_continents_1party, cdgeb_utils = \
-        parse_datasets_1party(input_dir)
+    testing_mode = os.path.isfile(os.path.join(input_dir, SOLUTION_DATA_FILE))
 
-    measurements_3party, frontend_locations_3party, filenames, file_locations, file_datacenter_mapping = \
-        parse_datasets_3party(input_dir, cdgeb_utils.datacenter_locations)
+    cdgeb_utils_1party, cdgeb_utils_3party = parse_input_files(input_dir, testing_mode)
 
-    csp_delays, csp_general_rate, csp_rates, datacenter_frontend_mapping = learn_from_data(measurements_1party,
-                                                                                           cdgeb_utils,
-                                                                                           measurements_3party,
-                                                                                           frontend_locations_3party,
-                                                                                           filenames, method)
+    if not validate_input_files(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
+        return
 
-    geolocate_from_data(cdgeb_utils, csp_delays, csp_rates, output_dir, datacenter_frontend_mapping, filenames,
-                        file_locations, file_datacenter_mapping)
+    csp_rates = learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode)
 
-    # TODO: csp_rates should actually be recalculated in the geolocate_from_data function
-    # TODO: (to represent the 'user' rtts and not the 'geolocator' rtts)
+    geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode)
 
 
 def main(input_dir, output_dir=None, method=None):
@@ -517,14 +306,11 @@ if __name__ == '__main__':
         input_dir = sys.argv[1]
     else:
         # Run from src. (python -m CDGeB1.main)
-        input_dir = 'Datasets/BGU-150823/'
-        # third_party_dataset = os.path.join(input_dir, '3_party')
-        # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240216'
-        # input_dir = 'CDGeB1\\Datasets\\Fujitsu-240304'
+        input_dir = 'Datasets/DS-B1/'
 
     if len(sys.argv) > 2:
         output_dir = sys.argv[2]
     else:
         output_dir = None  # Use default
 
-    main(input_dir, output_dir, ORIGINAL_METHOD)
+    main(input_dir, output_dir, METHOD_OPTIMIZATION)

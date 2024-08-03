@@ -1,0 +1,25 @@
+Each dataset folder contains:
+- datacenters.csv
+- measurements-1party.csv
+- measurements-3party.csv (same file as measurements-1party.csv)
+- servers-1party.csv (including the true locations of the files)
+- servers-3party.csv (excluding the true locations of the files)
+- solution.csv
+
+
+The algorithm expects:
+- measurements-1party.csv
+- measurements-3party.csv
+- servers-1party.csv (including the true locations of the files)
+- servers-3party.csv (excluding the true locations of the files)
+- data_centers.csv
+- solution.csv (optional)
+
+
+To use the algorithm with DS-F3 as 1st-party, and DS-F4 as 3rd-party:
+- use DS-F3/measurements-1party.csv as measurements-1party.csv
+- use DS-F3/servers-1party.csv as servers-1party.csv
+- use DS-F4/measurements-3party.csv as measurements-3party.csv
+- use DS-F4/servers-3party.csv as servers-3party.csv
+- use DS-F4/data_centers.csv as data_centers.csv
+- optionally, use DS-F/solution.csv as solution.csv to test the accuracy

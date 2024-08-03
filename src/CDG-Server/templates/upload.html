@@ -7,17 +7,17 @@
     <h2>Upload Files</h2>
     <form action="/uploader" method="post" enctype="multipart/form-data">
         <fieldset>
-            <legend>Training Dataset</legend>
-            <label for="measurements.csv">measurements.csv:</label>
+            <legend>1st-Party Dataset</legend>
+            <label for="measurements-1party.csv">measurements-1party.csv:</label>
             <input type="file" name="measurements-1party" required><br><br>
-            <label for="servers.csv">servers.csv:</label>
+            <label for="servers-1party.csv">servers-1party.csv:</label>
             <input type="file" name="servers-1party" required><br><br>
         </fieldset>
         <fieldset>
-            <legend>Testing Dataset</legend>
-            <label for="measurements2.csv">measurements.csv:</label>
+            <legend>3rd-Party Dataset</legend>
+            <label for="measurements-3party.csv">measurements-3party.csv:</label>
             <input type="file" name="measurements-3party" required><br><br>
-            <label for="servers2.csv">servers.csv:</label>
+            <label for="servers-3party.csv">servers-3party.csv:</label>
             <input type="file" name="servers-3party" required><br><br>
             <label for="datacenters.csv">datacenters.csv:</label>
             <input type="file" name="datacenters" required><br><br>
@@ -26,12 +26,12 @@
         </fieldset>
         <label for="method">Choose calculation method:</label>
         <select name="method" id="method">
-            <option value="original">Original</option>
+            <option value="subtraction">Subtraction</option>
             <option value="optimizer">Optimizer</option>
         </select><br><br>
         <input type="submit" value="Upload">
     </form>
 
-    <p>Version: v0.5</p>
+    <p>Version: v1.0</p>
 </body>
 </html>
