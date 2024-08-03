@@ -170,7 +170,8 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
 
     # Stages - Geolocation
     # Create map of all geolocated targets
-    map_all_targets = MapBuilder("all_targets", cdgeb_utils_3party.probe_clients, cdgeb_utils_3party.datacenters)
+    map_all_targets = MapBuilder("all_targets", cdgeb_utils_3party.probe_clients,
+                                 cdgeb_utils_3party.possible_file_datacenters)
     map_all_targets.add_datacenter()
 
     # Initialize a geolocator
@@ -254,9 +255,12 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
         final_mean_error = np.mean([err[1] for err in errors])
         final_max_error = np.max([err[1] for err in errors])
         final_rmse_error = np.sqrt(np.mean(np.square([err[1] for err in errors])))
+        total_successes = len([err[1] for err in errors if err[1] == 0])
+        total_attempts = len(errors)
         print("Final-Geolocation Mean Error:\t", round(final_mean_error, 2), "\t[km]")
         print("Final-Geolocation Max Error:\t", round(final_max_error, 2), "\t[km]")
         print("Final-Geolocation RMSE Error:\t", round(final_rmse_error, 2), "\t[km]")
+        print(f"Success rate:\t\t\t{total_successes}/{total_attempts} ({100 * total_successes / total_attempts:.2f}%)")
         print()
 
         multilateration_mean_error = np.mean([err[0] for err in errors])

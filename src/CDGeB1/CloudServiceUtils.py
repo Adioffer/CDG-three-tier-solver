@@ -209,7 +209,10 @@ class DatasetUtils:
         # Initial guess for the delays
         count_rtts_1hop = num_probes * num_frontends
         count_rtts_2hop = num_frontends * num_files
-        initial_guess = np.zeros(count_rtts_1hop + count_rtts_2hop)
+
+        average_rtt = np.mean(list(measurements.values()))
+
+        initial_guess = np.array([average_rtt/2] * (count_rtts_1hop + count_rtts_2hop))
         param_bounds = (
                 [(0, None)] * len(initial_guess)
         )
