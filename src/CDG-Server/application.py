@@ -44,7 +44,7 @@ def upload_files():
         file6 = request.files.get('solution')
 
         if not (file1 and file2 and file3 and file4 and file5):
-            return 'Missing files. Please ensure all three files are uploaded.'
+            return 'Missing files. Please ensure all files are uploaded.'
 
         method = request.form['method']
 
@@ -115,7 +115,7 @@ def rest_api() -> str:
     file6 = request.files.get('solution')
 
     if not (file1 and file2 and file3 and file4 and file5):
-        return 'Missing files. Please ensure all three files are uploaded.'
+        return 'Missing files. Please ensure all files are uploaded.'
 
     method = request.form['method']
 

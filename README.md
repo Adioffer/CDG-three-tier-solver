@@ -27,9 +27,14 @@ python -m CDGeB1.main
 ```
 
 ### Deploy to AWS
-0. Don't forget to update the version number in relevant files
+Preparation:
+1. Don't forget to update the version number in relevant files
    - ```upload.html```
    - future files ...
+2. Delete folders inside webappstorage\sessions
+3. Delete ouput files inside datasets directory, if any
+
+Steps:
 1. ```cd CDG-Server```
 2. ZIP the following into ```CDG-V0.X.zip```:
    - ```.ebextensions\```
