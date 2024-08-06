@@ -205,7 +205,7 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
             return
 
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{target_file.name}_estimated', cdgeb_utils_3party.probe_clients,
+        map_single_target = MapBuilder(f'{target_file.name.replace(" ", "_")}_estimated', cdgeb_utils_3party.probe_clients,
                                        cdgeb_utils_3party.datacenters)
         map_single_target.add_datacenter()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}')
