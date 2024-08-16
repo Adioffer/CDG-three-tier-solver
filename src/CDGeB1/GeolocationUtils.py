@@ -1,10 +1,14 @@
 import numpy as np
 from scipy.optimize import minimize
-from CDGeB1.data_classes import Continent, FrontEnd  # for content-aware
+from CDGeB1.data_classes import Continent, FrontEnd, DataFile, DataCenter
 from CDGeB1.CloudServiceUtils import haversine
 
 
 class MultilaterationUtils:
+    """
+    This class is a utility class for geolocating a target using multilateration.
+    """
+
     def __init__(self, frontend_servers: dict,
                  csp_general_rate: float = None, csp_rates: dict = None):
         """
@@ -118,3 +122,72 @@ class MultilaterationUtils:
             frontend in self.frontend_server for frontend in distances), "Inputs do not match (distances, fe_locations)"
 
         return self._geolocate_using_scipy(distances)
+
+
+class ProfilingUtils:
+    """
+    This class is a utility class for geolocating a target using profiling-based method.
+    Note that 1-st party fingerprints might contain more datacenters than in the 3-party case.
+    """
+
+    type Fingerprint = dict[DataCenter, float]
+    type FeatureVector = dict[DataCenter, float]
+
+    def __init__(self, datacenters: list[DataCenter], fingerprints: dict[DataCenter, Fingerprint] = None):
+        self.csp_datacenters = datacenters
+        self.csp_fingerprints = fingerprints
+
+    def create_1party_fingerprints(self, measurements_2hop: dict[tuple[FrontEnd, DataFile], float]) \
+            -> dict[DataCenter, Fingerprint]:
+        """
+        Given measurements from 2-hop measurements, create fingerprints for each datacenter.
+        """
+
+        fingerprints = dict()
+        for (frontend, file), delay in measurements_2hop.items():
+            if frontend.datacenter not in fingerprints:
+                fingerprints[frontend.datacenter] = dict()
+            fingerprints[frontend.datacenter][file.datacenter] = delay
+
+        self.csp_fingerprints = fingerprints
+        return fingerprints
+
+    def evaluate_feature_vectors(self, measurements_to_target: dict[FrontEnd, float]) \
+            -> FeatureVector:
+        """
+        Given measurements to a target, evaluate the feature vector.
+        """
+
+        feature_vector = dict()
+        for frontend, delay in measurements_to_target.items():
+            feature_vector[frontend.datacenter] = delay
+
+        return feature_vector
+
+    def match_feature_vector_to_fingerprint(self, feature_vector: FeatureVector,
+                                            possible_file_datacenters: list[DataCenter]) -> DataCenter:
+        """
+        Given a feature vector, match it to the most similar fingerprint, and return the associated datacenter.
+        """
+
+        possible_fingerprints = {datacenter: self.csp_fingerprints[datacenter] for datacenter in
+                                 possible_file_datacenters}
+        feature_vector_reduced = np.array([feature_vector[datacenter] for datacenter in possible_file_datacenters])
+
+        def similarity(fingerprint) -> float:
+            """
+            Compute the similarity between a fingerprint and a feature vector.
+            """
+
+            # Reason: the fingerprint might contain more datacenters than the feature vector
+            # and also, this vector must be in the same order as the feature_vector_reduced
+            fingerprint_reduced = np.array([fingerprint.get[datacenter] for datacenter in possible_file_datacenters])
+
+            # return np.linalg.norm(fingerprint_reduced - feature_vector_reduced)
+            return np.dot(fingerprint_reduced, feature_vector_reduced) / (
+                        np.linalg.norm(fingerprint_reduced) * np.linalg.norm(feature_vector_reduced))
+
+        # Find the most similar fingerprint
+        best_match = max(possible_fingerprints, key=lambda x: similarity(possible_fingerprints[x]))
+
+        return best_match
