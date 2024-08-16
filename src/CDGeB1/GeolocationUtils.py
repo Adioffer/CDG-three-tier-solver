@@ -152,7 +152,7 @@ class ProfilingUtils:
         self.csp_fingerprints = fingerprints
         return fingerprints
 
-    def evaluate_feature_vectors(self, measurements_to_target: dict[FrontEnd, float]) \
+    def evaluate_feature_vector(self, measurements_to_target: dict[FrontEnd, float]) \
             -> FeatureVector:
         """
         Given measurements to a target, evaluate the feature vector.
@@ -168,24 +168,28 @@ class ProfilingUtils:
                                             possible_file_datacenters: list[DataCenter]) -> DataCenter:
         """
         Given a feature vector, match it to the most similar fingerprint, and return the associated datacenter.
+
+        Note that since the 3-party measurements include only a subset of the datacenters used in 1-party measurements,
+        and because we also exclude measurements from the front-end server associated with the target file in testing mode,
+        it is necessary to construct new fingerprints of the 3-party dataset in each geolocation attempt of target file.
         """
 
-        possible_fingerprints = {datacenter: self.csp_fingerprints[datacenter] for datacenter in
-                                 possible_file_datacenters}
-        feature_vector_reduced = np.array([feature_vector[datacenter] for datacenter in possible_file_datacenters])
+        possible_fingerprints = dict()
+        for datacenter in possible_file_datacenters:
+            fingerprint_full = self.csp_fingerprints[datacenter]
+            fingerprint_reduced = [fingerprint_full[datacenter] for datacenter in feature_vector]
+            possible_fingerprints[datacenter] = np.array(fingerprint_reduced)
+
+        feature_vector_as_array = np.array([feature_vector[datacenter] for datacenter in feature_vector])
 
         def similarity(fingerprint) -> float:
             """
             Compute the similarity between a fingerprint and a feature vector.
             """
 
-            # Reason: the fingerprint might contain more datacenters than the feature vector
-            # and also, this vector must be in the same order as the feature_vector_reduced
-            fingerprint_reduced = np.array([fingerprint.get[datacenter] for datacenter in possible_file_datacenters])
-
             # return np.linalg.norm(fingerprint_reduced - feature_vector_reduced)
-            return np.dot(fingerprint_reduced, feature_vector_reduced) / (
-                        np.linalg.norm(fingerprint_reduced) * np.linalg.norm(feature_vector_reduced))
+            return np.dot(fingerprint_reduced, feature_vector_as_array) / (
+                        np.linalg.norm(fingerprint_reduced) * np.linalg.norm(feature_vector_as_array))
 
         # Find the most similar fingerprint
         best_match = max(possible_fingerprints, key=lambda x: similarity(possible_fingerprints[x]))
