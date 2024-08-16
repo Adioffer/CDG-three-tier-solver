@@ -260,11 +260,13 @@ def geolocation_main(input_dir, output_dir, rtt_method, geolocation_method):
 
     if not validate_inputs(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, geolocation_method, testing_mode):
         # Already logged inside
-        return
+        return False
 
     evaluate_csp_rates_and_rtts(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, testing_mode)
 
     geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geolocation_method, testing_mode)
+
+    return True
 
 
 if __name__ == '__main__':

@@ -86,7 +86,7 @@ def upload_files():
             print()
 
             try:
-                CDG_main(input_path, output_path, rtt_method, geolocation_method)
+                success = CDG_main(input_path, output_path, rtt_method, geolocation_method)
             finally:
                 # Reset sys.stdout to its original value
                 sys.stdout = original_stdout
@@ -109,14 +109,15 @@ def upload_files():
                     arcname = os.path.relpath(file_path, start=os.path.dirname(input_path))
                     zipf.write(file_path, arcname=arcname)
 
-        return render_template('download.html', output_file_path=relative_zip_output_path)
+        return (render_template('download.html', output_file_path=relative_zip_output_path),
+                400 if not success else 200)
     else:
         return 'Invalid request'
 
 
 # REST API
 @application.route('/rest', methods=['POST'])
-def rest_api() -> str:
+def rest_api():
     # Ensure all three files are present
     file1 = request.files.get('measurements-1party')
     file2 = request.files.get('servers-1party')
@@ -172,8 +173,7 @@ def rest_api() -> str:
         print()
 
         try:
-            CDG_main(input_path, output_path, rtt_method, geolocation_method)
-
+            success = CDG_main(input_path, output_path, rtt_method, geolocation_method)
         finally:
             # Reset sys.stdout to its original value
             sys.stdout = original_stdout
@@ -196,7 +196,7 @@ def rest_api() -> str:
             outputAsDict['Assets'][file] = "http://" + domain_name + arcname.replace('\\', '/').replace('sessions',
                                                                                                         '/GetFile')
 
-    return json.dumps(outputAsDict, indent=4)
+    return json.dumps(outputAsDict, indent=4), 400 if not success else 200
 
 
 @application.route('/GetFile/<path:filepath>', methods=['GET'])
