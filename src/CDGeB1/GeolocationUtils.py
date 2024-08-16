@@ -187,9 +187,8 @@ class ProfilingUtils:
             Compute the similarity between a fingerprint and a feature vector.
             """
 
-            # return np.linalg.norm(fingerprint_reduced - feature_vector_reduced)
-            return np.dot(fingerprint_reduced, feature_vector_as_array) / (
-                        np.linalg.norm(fingerprint_reduced) * np.linalg.norm(feature_vector_as_array))
+            return np.dot(fingerprint, feature_vector_as_array) / (
+                        np.linalg.norm(fingerprint) * np.linalg.norm(feature_vector_as_array))
 
         # Find the most similar fingerprint
         best_match = max(possible_fingerprints, key=lambda x: similarity(possible_fingerprints[x]))
