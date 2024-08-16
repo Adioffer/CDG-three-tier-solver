@@ -7,7 +7,7 @@ import datetime
 from multiprocessing import freeze_support
 from flask import Flask, request, render_template, send_from_directory
 
-from CDGeB1.main import main as CDG_main
+from CDGeB1.main import geolocation_main as CDG_main
 
 ROOT_DIR = os.path.join(os.path.dirname(__file__), 'webappstorage')
 SESSIONS_DIR = os.path.join(ROOT_DIR, 'sessions')

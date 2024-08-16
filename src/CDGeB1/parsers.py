@@ -4,15 +4,15 @@ from statistics import mean, median
 
 from CDGeB1.data_classes import *
 
-__all__ = ['check_files_exist', 'parse_datacenters', 'parse_servers_1party', 'parse_servers_3party',
+__all__ = ['check_files_exist', 'is_testing_mode', 'parse_datacenters', 'parse_servers_1party', 'parse_servers_3party',
            'parse_measurements_1party', 'parse_measurements_3party', 'parse_solution', ]
 
-MEASUREMENT_FILE_1PARTY = 'measurements-1party.csv'
-SERVERS_DATA_FILE_1PARTY = 'servers-1party.csv'
-DATACENTERS_FILE = 'datacenters.csv'
-MEASUREMENT_FILE_3PARTY = 'measurements-3party.csv'
-SERVERS_DATA_FILE_3PARTY = 'servers-3party.csv'
-SOLUTION_DATA_FILE = 'solution.csv'
+FILE_MEASUREMENTS_1PARTY = 'measurements-1party.csv'
+FILE_SERVERS_1PARTY = 'servers-1party.csv'
+FILE_DATACENTERS = 'datacenters.csv'
+FILE_MEASUREMENTS_3PARTY = 'measurements-3party.csv'
+FILE_SERVERS_3PARTY = 'servers-3party.csv'
+FILE_SOLUTION = 'solution.csv'
 
 MEASUREMENT_PROBES = 0
 MEASUREMENT_FRONTENDS = 1
@@ -27,39 +27,43 @@ COORDINATES_LENGTH = 2
 
 
 def check_files_exist(input_dir):
-    filepath = os.path.join(input_dir, MEASUREMENT_FILE_1PARTY)
+    filepath = os.path.join(input_dir, FILE_MEASUREMENTS_1PARTY)
     if not os.path.isfile(filepath):
-        print("Missing file", MEASUREMENT_FILE_1PARTY)
+        print("Missing file", FILE_MEASUREMENTS_1PARTY)
         return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY)):
-        print("Missing file", SERVERS_DATA_FILE_1PARTY)
+    if not os.path.isfile(os.path.join(input_dir, FILE_SERVERS_1PARTY)):
+        print("Missing file", FILE_SERVERS_1PARTY)
         return False
-    if not os.path.isfile(os.path.join(input_dir, DATACENTERS_FILE)):
-        print("Missing file", DATACENTERS_FILE)
+    if not os.path.isfile(os.path.join(input_dir, FILE_DATACENTERS)):
+        print("Missing file", FILE_DATACENTERS)
         return False
-    if not os.path.isfile(os.path.join(input_dir, MEASUREMENT_FILE_3PARTY)):
-        print("Missing file", MEASUREMENT_FILE_3PARTY)
+    if not os.path.isfile(os.path.join(input_dir, FILE_MEASUREMENTS_3PARTY)):
+        print("Missing file", FILE_MEASUREMENTS_3PARTY)
         return False
-    if not os.path.isfile(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY)):
-        print("Missing file", SERVERS_DATA_FILE_3PARTY)
+    if not os.path.isfile(os.path.join(input_dir, FILE_SERVERS_3PARTY)):
+        print("Missing file", FILE_SERVERS_3PARTY)
         return False
     return True
+
+
+def is_testing_mode(input_dir):
+    return os.path.isfile(os.path.join(input_dir, FILE_SOLUTION))
 
 
 def parse_datacenters(input_dir) -> tuple[list[DataCenter], list[DataCenter]]:
     datacenters = list()
     possible_file_datacenters = list()
 
-    with open(os.path.join(input_dir, DATACENTERS_FILE), 'r') as f:
+    with open(os.path.join(input_dir, FILE_DATACENTERS), 'r') as f:
         csv_reader = csv.reader(f, delimiter=',')
         for row in csv_reader:
             row = list(filter(None, row))  # Remove empty strings
             if len(row) != 4 and len(row) != 5:
-                print(f"Skipping invalid row in file {DATACENTERS_FILE}: {row}")
+                print(f"Skipping invalid row in file {FILE_DATACENTERS}: {row}")
                 continue
 
             if len(row) == 5 and row[4] != 'learn_only':
-                print(f"Skipping invalid row in file {DATACENTERS_FILE}: {row}")
+                print(f"Skipping invalid row in file {FILE_DATACENTERS}: {row}")
                 continue
 
             name, lat, lon, continent = row[:4]
@@ -81,7 +85,7 @@ def parse_servers_1party(input_dir, datacenters: list[DataCenter]):
     frontend_servers = list()
     data_files = list()
 
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE_1PARTY), 'r') as f:
+    with open(os.path.join(input_dir, FILE_SERVERS_1PARTY), 'r') as f:
         csv_reader = csv.reader(f, delimiter=',')
         for row in csv_reader:
             row = list(filter(None, row))  # Remove empty strings
@@ -100,7 +104,7 @@ def parse_servers_1party(input_dir, datacenters: list[DataCenter]):
                 datacenter = [dc for dc in datacenters if dc.name == datacenter_name][0]
                 data_files.append(DataFile(name, datacenter))
             else:
-                print("[WARNING] Skipping invalid row in file", SERVERS_DATA_FILE_1PARTY, ":", row)
+                print("[WARNING] Skipping invalid row in file", FILE_SERVERS_1PARTY, ":", row)
 
     return probe_clients, frontend_servers, data_files
 
@@ -110,7 +114,7 @@ def parse_servers_3party(input_dir, datacenters: list[DataCenter]):
     frontend_servers = list()
     data_files = list()
 
-    with open(os.path.join(input_dir, SERVERS_DATA_FILE_3PARTY), 'r') as f:
+    with open(os.path.join(input_dir, FILE_SERVERS_3PARTY), 'r') as f:
         csv_reader = csv.reader(f, delimiter=',')
         for row in csv_reader:
             row = list(filter(None, row))  # Remove empty strings
@@ -128,7 +132,7 @@ def parse_servers_3party(input_dir, datacenters: list[DataCenter]):
                 name = row[1]
                 data_files.append(DataFile(name))
             else:
-                print("[WARNING] Skipping invalid row in file", SERVERS_DATA_FILE_3PARTY, ":", row)
+                print("[WARNING] Skipping invalid row in file", FILE_SERVERS_3PARTY, ":", row)
 
     return probe_clients, frontend_servers, data_files
 
@@ -184,16 +188,16 @@ def parse_measurements(input_dir, measurement_file, probe_clients, frontend_serv
 
 
 def parse_measurements_1party(input_dir, probe_clients, frontend_servers, data_files):
-    return parse_measurements(input_dir, MEASUREMENT_FILE_1PARTY, probe_clients, frontend_servers, data_files)
+    return parse_measurements(input_dir, FILE_MEASUREMENTS_1PARTY, probe_clients, frontend_servers, data_files)
 
 
 def parse_measurements_3party(input_dir, probe_clients, frontend_servers, data_files):
-    return parse_measurements(input_dir, MEASUREMENT_FILE_3PARTY, probe_clients, frontend_servers, data_files)
+    return parse_measurements(input_dir, FILE_MEASUREMENTS_3PARTY, probe_clients, frontend_servers, data_files)
 
 
 def parse_solution(input_dir, datacenters, data_files):
     file_datacenter_mapping = dict()
-    with open(os.path.join(input_dir, SOLUTION_DATA_FILE), 'r') as f:
+    with open(os.path.join(input_dir, FILE_SOLUTION), 'r') as f:
         reader = csv.reader(f, delimiter=',')
         for row in reader:
             row = list(filter(None, row))  # Remove empty strings
@@ -203,6 +207,6 @@ def parse_solution(input_dir, datacenters, data_files):
                 datacenter = [dc for dc in datacenters if dc.name == datacenter_name][0]
                 file_datacenter_mapping[file] = datacenter
             else:
-                print(f"Skipping incomplete row in file {SOLUTION_DATA_FILE}: {row}")
+                print(f"Skipping incomplete row in file {FILE_SOLUTION}: {row}")
 
     return file_datacenter_mapping

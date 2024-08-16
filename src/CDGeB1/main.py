@@ -1,40 +1,19 @@
 import os
 import sys
-import csv
 import numpy as np
 from rich.console import Console
 from rich.table import Table
 
 from CDGeB1.CloudServiceUtils import *
-from CDGeB1.GeolocationUtils import MultilaterationUtils
+from CDGeB1.GeolocationUtils import MultilaterationUtils, ProfilingUtils
 from CDGeB1.data_classes import *
 from CDGeB1.plot_map import MapBuilder
 from CDGeB1.parsers import *
 
-import itertools
-import random
-import pickle
-
-MEASUREMENT_FILE_1PARTY = 'measurements-1party.csv'
-SERVERS_DATA_FILE_1PARTY = 'servers-1party.csv'
-DATACENTERS_FILE = 'datacenters.csv'
-MEASUREMENT_FILE_3PARTY = 'measurements-3party.csv'
-SERVERS_DATA_FILE_3PARTY = 'servers-3party.csv'
-SOLUTION_DATA_FILE = 'solution.csv'
-
-MEASUREMENT_PROBES = 0
-MEASUREMENT_FRONTENDS = 1
-MEASUREMENT_FILES = 2
-
-MEASUREMENT_FILE_ENTRY_LENGTH = 23
-SERVER_FILE_FULL_ENTRY_LENGTH = 4
-DATACENTER_FILE_ENTRY_LENGTH = 5
-SOLUTION_FILE_ENTRY_LENGTH = 2
-
-COORDINATES_LENGTH = 2
-
-METHOD_SUBTRACTION = "subtraction"
-METHOD_OPTIMIZATION = "optimizer"
+METHOD_SUBTRACTION = "Subtraction"
+METHOD_OPTIMIZATION = "Optimizer"
+METHOD_MULTILATERATION = "Multilateration"
+METHOD_PROFILING = "Profiling"
 
 
 def parse_input_files(input_dir, testing_mode=False):
@@ -71,8 +50,16 @@ def parse_input_files(input_dir, testing_mode=False):
     return cdgeb_utils_1party, cdgeb_utils_3party
 
 
-def validate_input_files(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
-    if method == METHOD_SUBTRACTION:
+def validate_inputs(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, geolocation_method, testing_mode):
+    if rtt_method not in [METHOD_SUBTRACTION, METHOD_OPTIMIZATION]:
+        print("[ERROR] Invalid 2-hop RTT extraction method:", rtt_method)
+        return False
+
+    if geolocation_method not in [METHOD_MULTILATERATION, METHOD_PROFILING]:
+        print("[ERROR] Invalid geolocation method:", geolocation_method)
+        return False
+
+    if rtt_method == METHOD_SUBTRACTION:
         # Each datacenter utilized by 3Party must be present in 1Party
         if not set(cdgeb_utils_3party.datacenters) <= set(cdgeb_utils_1party.datacenters):
             print("[ERROR] Datacenters in 3Party not found in 1Party")
@@ -98,9 +85,12 @@ def validate_input_files(cdgeb_utils_1party, cdgeb_utils_3party, method, testing
     return True
 
 
-def learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode=False):
-    # Stage - Evaluate second-hop RTTs and CSP transmission rates
-    if method == METHOD_SUBTRACTION:
+def evaluate_csp_rates_and_rtts(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, testing_mode=False):
+    """
+    This function uses the 1st-party dataset to compute the CSP rates and second-hop RTTs,
+    and then computes the second-hop RTTs for the 3rd-party dataset.
+    """
+    if rtt_method == METHOD_SUBTRACTION:
         cdgeb_utils_1party.compute_csp_delays_subtraction()
         csp_general_rate = cdgeb_utils_1party.evaluate_csp_general_rate()
         csp_rates = cdgeb_utils_1party.evaluate_csp_rates()
@@ -114,7 +104,8 @@ def learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode
         cdgeb_utils_3party.csp_rates = csp_rates
         cdgeb_utils_3party.compute_csp_delays_subtraction(cdgeb_utils_1party)
 
-    elif method == METHOD_OPTIMIZATION:
+    else:
+        # rtt_method == METHOD_OPTIMIZATION
         cdgeb_utils_1party.compute_csp_delays_optimizer()
         csp_general_rate = cdgeb_utils_1party.evaluate_csp_general_rate()
         csp_rates = cdgeb_utils_1party.evaluate_csp_rates()
@@ -127,32 +118,11 @@ def learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode
 
         cdgeb_utils_3party.csp_rates = csp_rates
         cdgeb_utils_3party.compute_csp_delays_optimizer()
-    else:
-        print("[ERROR] Invalid method:", method)
-        return
 
     return csp_rates
 
 
-def are_tables_equal(table1, table2):
-    if table1.title != table2.title:
-        return False
-    if len(table1.columns) != len(table2.columns):
-        return False
-    for col1, col2 in zip(table1.columns, table2.columns):
-        if col1.header != col2.header:
-            return False
-    rows1 = list(table1.rows)
-    rows2 = list(table2.rows)
-    if len(rows1) != len(rows2):
-        return False
-    for row1, row2 in zip(rows1, rows2):
-        if row1 != row2:
-            return False
-    return True
-
-
-def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
+def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geolocation_method, testing_mode):
     if testing_mode:
         # Create a Rich table for results
         table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
@@ -174,38 +144,40 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
                                  cdgeb_utils_3party.possible_file_datacenters)
     map_all_targets.add_datacenter()
 
-    # Initialize a geolocator
-    if method == METHOD_SUBTRACTION or method == METHOD_OPTIMIZATION:
+    # Preparation for geolocation
+    if geolocation_method == METHOD_MULTILATERATION:
         csp_geolocator = MultilaterationUtils(cdgeb_utils_3party.frontend_servers,
                                               csp_rates=cdgeb_utils_3party.csp_rates)
     else:
-        print("[ERROR] Invalid method:", method)
-        return
+        # geolocation_method == METHOD_PROFILING
+        csp_geolocator = ProfilingUtils(cdgeb_utils_1party.datacenters)
+        csp_geolocator.create_1party_fingerprints(cdgeb_utils_1party.csp_delays)
 
     errors = []
     for target_file in cdgeb_utils_3party.data_files:
+        # Prepare delays from front-end servers for the target file.
+        # Remove delays from front-end server in the same datacenter.
+        delays_from_server = {k[0]: v for (k, v) in cdgeb_utils_3party.csp_delays.items()
+                              if k[1] == target_file and k[0].datacenter != k[1].datacenter}
+        if testing_mode:
+            frontend_in_same_datacenter = [fe for fe in cdgeb_utils_3party.frontend_servers
+                                           if fe.datacenter == cdgeb_utils_3party.solutions[target_file]][0]
+            delays_from_server.pop(frontend_in_same_datacenter)
 
-        if method == METHOD_SUBTRACTION or method == METHOD_OPTIMIZATION:
-            # Prepare delays from front-end servers for the target file.
-            # Remove delays from front-end server in the same datacenter.
-            delays_from_server = {k[0]: v for (k, v) in cdgeb_utils_3party.csp_delays.items()
-                                  if k[1] == target_file and k[0].datacenter != k[1].datacenter}
-            if testing_mode:
-                frontend_in_same_datacenter = [fe for fe in cdgeb_utils_3party.frontend_servers
-                                               if fe.datacenter == cdgeb_utils_3party.solutions[target_file]][0]
-                delays_from_server.pop(frontend_in_same_datacenter)
-
-            # Geolocation
+        # Geolocation
+        if geolocation_method == METHOD_MULTILATERATION:
             estimated_location = csp_geolocator.geolocate_target(delays_from_server)
-
             closest_datacenter = cdgeb_utils_3party.position_correction(estimated_location)
-
         else:
-            print("[ERROR] Invalid method:", method)
-            return
+            # geolocation_method == METHOD_PROFILING
+            feature_vector = csp_geolocator.evaluate_feature_vector(delays_from_server)
+            closest_datacenter = csp_geolocator.match_feature_vector_to_fingerprint(feature_vector,
+                                                                                    cdgeb_utils_3party.possible_file_datacenters)
+            estimated_location = closest_datacenter.coordinates
 
         # Make target-specific map file
-        map_single_target = MapBuilder(f'{target_file.name.replace(" ", "_")}_estimated', cdgeb_utils_3party.probe_clients,
+        map_single_target = MapBuilder(f'{target_file.name.replace(" ", "_")}_estimated',
+                                       cdgeb_utils_3party.probe_clients,
                                        cdgeb_utils_3party.datacenters)
         map_single_target.add_datacenter()
         map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}')
@@ -246,11 +218,7 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
     # Print the table
     console = Console()
     console.print(table)
-    output_table_path = os.path.join(output_dir, 'table.pkl')
-    # with open(output_table_path, 'wb') as f:
-    #     pickle.dump(table, f)
-    # with open(output_table_path, 'rb') as f:
-    #     test_table = pickle.load(f)
+
     if testing_mode:
         final_mean_error = np.mean([err[1] for err in errors])
         final_max_error = np.max([err[1] for err in errors])
@@ -270,27 +238,12 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, meth
         print("Multilateration Max Error:\t", round(multilateration_max_error, 2), "\t[km]")
         print("Multilateration RMSE Error:\t", round(multilateration_rmse_error, 2), "\t[km]")
         print()
-    # print(
-    #     f'The table is {"" if are_tables_equal(test_table, table) else "not"}similar to the original table before the change!!')
 
     # Save the map
     map_all_targets.save_map(output_dir)
 
 
-def geolocation_main(input_dir, output_dir, method):
-    testing_mode = os.path.isfile(os.path.join(input_dir, SOLUTION_DATA_FILE))
-
-    cdgeb_utils_1party, cdgeb_utils_3party = parse_input_files(input_dir, testing_mode)
-
-    if not validate_input_files(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode):
-        return
-
-    csp_rates = learn_from_data(cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode)
-
-    geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, method, testing_mode)
-
-
-def main(input_dir, output_dir=None, method=None):
+def geolocation_main(input_dir, output_dir, rtt_method, geolocation_method):
     if not output_dir:
         output_dir = os.path.join(input_dir, 'out')
     if not check_files_exist(input_dir):
@@ -301,7 +254,17 @@ def main(input_dir, output_dir=None, method=None):
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
-    geolocation_main(input_dir, output_dir, method)
+    testing_mode = is_testing_mode(input_dir)
+
+    cdgeb_utils_1party, cdgeb_utils_3party = parse_input_files(input_dir, testing_mode)
+
+    if not validate_inputs(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, geolocation_method, testing_mode):
+        # Already logged inside
+        return
+
+    evaluate_csp_rates_and_rtts(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, testing_mode)
+
+    geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geolocation_method, testing_mode)
 
 
 if __name__ == '__main__':
@@ -317,4 +280,4 @@ if __name__ == '__main__':
     else:
         output_dir = None  # Use default
 
-    main(input_dir, output_dir, METHOD_OPTIMIZATION)
+    geolocation_main(input_dir, output_dir, METHOD_SUBTRACTION, METHOD_MULTILATERATION)
