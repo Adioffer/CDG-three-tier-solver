@@ -5,3 +5,4 @@ tmp/
 webappstorage/
 *.idea/
 *.zip
+**/api-client-out/*/*

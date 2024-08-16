@@ -49,8 +49,8 @@ def upload_files():
         rtt_method = request.form['rtt_method']
         geolocation_method = request.form['geolocation_method']
 
-        if rtt_method not in ['Subtraction', 'Optimizer']:
-            return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimizer.'
+        if rtt_method not in ['Subtraction', 'Optimization']:
+            return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimization.'
 
         if geolocation_method not in ['Multilateration', 'Profiling']:
             return 'Invalid geolocation method. Please select either Multilateration or Profiling.'
@@ -132,8 +132,8 @@ def rest_api():
     rtt_method = request.form['rtt_method']
     geolocation_method = request.form['geolocation_method']
 
-    if rtt_method not in ['Subtraction', 'Optimizer']:
-        return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimizer.'
+    if rtt_method not in ['Subtraction', 'Optimization']:
+        return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimization.'
 
     if geolocation_method not in ['Multilateration', 'Profiling']:
         return 'Invalid geolocation method. Please select either Multilateration or Profiling.'

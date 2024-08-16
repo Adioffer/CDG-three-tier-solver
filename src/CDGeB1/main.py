@@ -11,7 +11,7 @@ from CDGeB1.plot_map import MapBuilder
 from CDGeB1.parsers import *
 
 METHOD_SUBTRACTION = "Subtraction"
-METHOD_OPTIMIZATION = "Optimizer"
+METHOD_OPTIMIZATION = "Optimization"
 METHOD_MULTILATERATION = "Multilateration"
 METHOD_PROFILING = "Profiling"
 
