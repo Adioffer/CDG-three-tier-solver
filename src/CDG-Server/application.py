@@ -46,10 +46,14 @@ def upload_files():
         if not (file1 and file2 and file3 and file4 and file5):
             return 'Missing files. Please ensure all files are uploaded.'
 
-        method = request.form['method']
+        rtt_method = request.form['rtt_method']
+        geolocation_method = request.form['geolocation_method']
 
-        if method not in ['subtraction', 'optimizer']:
-            return 'Invalid method. Please select either Subtraction or Optimizer.'
+        if rtt_method not in ['Subtraction', 'Optimizer']:
+            return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimizer.'
+
+        if geolocation_method not in ['Multilateration', 'Profiling']:
+            return 'Invalid geolocation method. Please select either Multilateration or Profiling.'
 
         # Make new folder with uniquely generated name inside session directory
         session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
@@ -65,8 +69,10 @@ def upload_files():
         file3.save(os.path.join(input_path, 'measurements-3party.csv'))
         file4.save(os.path.join(input_path, 'servers-3party.csv'))
         file5.save(os.path.join(input_path, 'datacenters.csv'))
-        if (file6):
+
+        if file6:
             file6.save(os.path.join(input_path, 'solution.csv'))
+
         # Create a temporary file for the CDG output
         temp_output_path = os.path.join(output_path, "results.txt")
 
@@ -74,8 +80,13 @@ def upload_files():
         original_stdout = sys.stdout
         with open(temp_output_path, 'w') as f:
             sys.stdout = f
+            print("Running CDG with the following parameters:")
+            print(f"2-hop RTT extraction method: {rtt_method}")
+            print(f"Geolocation method: {geolocation_method}")
+            print()
+
             try:
-                CDG_main(input_path, output_path, method)
+                CDG_main(input_path, output_path, rtt_method, geolocation_method)
             finally:
                 # Reset sys.stdout to its original value
                 sys.stdout = original_stdout
@@ -117,10 +128,14 @@ def rest_api() -> str:
     if not (file1 and file2 and file3 and file4 and file5):
         return 'Missing files. Please ensure all files are uploaded.'
 
-    method = request.form['method']
+    rtt_method = request.form['rtt_method']
+    geolocation_method = request.form['geolocation_method']
 
-    if method not in ['subtraction', 'optimizer']:
-        return 'Invalid method. Please select either Subtraction or Optimizer.'
+    if rtt_method not in ['Subtraction', 'Optimizer']:
+        return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimizer.'
+
+    if geolocation_method not in ['Multilateration', 'Profiling']:
+        return 'Invalid geolocation method. Please select either Multilateration or Profiling.'
 
     domain_name = request.headers.get('Host')
     if domain_name is None:
@@ -151,8 +166,14 @@ def rest_api() -> str:
     original_stdout = sys.stdout
     with open(temp_output_path, 'w') as f:
         sys.stdout = f
+        print("Running CDG with the following parameters:")
+        print(f"2-hop RTT extraction method: {rtt_method}")
+        print(f"Geolocation method: {geolocation_method}")
+        print()
+
         try:
-            CDG_main(input_path, output_path, method)
+            CDG_main(input_path, output_path, rtt_method, geolocation_method)
+
         finally:
             # Reset sys.stdout to its original value
             sys.stdout = original_stdout
