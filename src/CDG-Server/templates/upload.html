@@ -8,30 +8,50 @@
     <form action="/uploader" method="post" enctype="multipart/form-data">
         <fieldset>
             <legend>1st-Party Dataset</legend>
+
             <label for="measurements-1party.csv">measurements-1party.csv:</label>
             <input type="file" name="measurements-1party" required><br><br>
+
             <label for="servers-1party.csv">servers-1party.csv:</label>
             <input type="file" name="servers-1party" required><br><br>
         </fieldset>
+
         <fieldset>
             <legend>3rd-Party Dataset</legend>
+
             <label for="measurements-3party.csv">measurements-3party.csv:</label>
             <input type="file" name="measurements-3party" required><br><br>
+
             <label for="servers-3party.csv">servers-3party.csv:</label>
             <input type="file" name="servers-3party" required><br><br>
+
             <label for="datacenters.csv">datacenters.csv:</label>
             <input type="file" name="datacenters" required><br><br>
+
             <label for="solution.csv">solution.csv (optional):</label>
             <input type="file" name="solution"><br><br>
         </fieldset>
-        <label for="method">Choose calculation method:</label>
-        <select name="method" id="method">
-            <option value="subtraction">Subtraction</option>
-            <option value="optimizer">Optimizer</option>
-        </select><br><br>
+
+        <fieldset>
+            <legend>Options</legend>
+
+            <label for="rtt_method">2-hop RTT extraction method:</label>
+            <select name="rtt_method" id="rtt_method">
+                <option value="Subtraction">Subtraction</option>
+                <option value="Optimizer">Optimizer</option>
+            </select><br><br>
+
+            <label for="geolocation_method">Geolocation method:</label>
+            <select name="geolocation_method" id="geolocation_method">
+                <option value="Multilateration">Multilateration</option>
+                <option value="Profiling">Profiling</option>
+            </select><br><br>
+
+        </fieldset>
+
         <input type="submit" value="Upload">
     </form>
 
-    <p>Version: v1.0</p>
+    <p>Version: v2.0</p>
 </body>
 </html>
