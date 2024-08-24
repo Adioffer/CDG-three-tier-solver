@@ -180,7 +180,6 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
                                        cdgeb_utils_3party.probe_clients,
                                        cdgeb_utils_3party.datacenters)
         map_single_target.add_datacenter()
-        map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}')
 
         true_file_datacenter = cdgeb_utils_3party.solutions[target_file] \
             if testing_mode else None
@@ -188,9 +187,14 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
             if testing_mode else None
 
         if testing_mode:
+            map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}',
+                                        color="green" if closest_datacenter.name == true_file_datacenter.name else "red")
             map_single_target.add_circle(estimated_location,
                                          haversine(estimated_location, true_file_coordinates))
             map_single_target.add_dashed_line(estimated_location, true_file_coordinates)
+        else:
+            map_single_target.add_point(estimated_location, f'estimated-location-of-{target_file.name}',
+                                        color="orange")
 
         map_single_target.add_line(estimated_location, closest_datacenter.coordinates)
         map_single_target.save_map(output_dir)
