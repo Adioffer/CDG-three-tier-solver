@@ -3,6 +3,11 @@ from scipy.optimize import minimize
 from CDGeB1.data_classes import Continent, FrontEnd, DataFile, DataCenter
 from CDGeB1.CloudServiceUtils import haversine
 
+from typing import TypeAlias
+
+Fingerprint: TypeAlias = dict[DataCenter, float]
+FeatureVector: TypeAlias = dict[DataCenter, float]
+
 
 class MultilaterationUtils:
     """
@@ -130,9 +135,6 @@ class ProfilingUtils:
     Note that 1-st party fingerprints might contain more datacenters than in the 3-party case.
     """
 
-    type Fingerprint = dict[DataCenter, float]
-    type FeatureVector = dict[DataCenter, float]
-
     def __init__(self, datacenters: list[DataCenter], fingerprints: dict[DataCenter, Fingerprint] = None):
         self.csp_datacenters = datacenters
         self.csp_fingerprints = fingerprints
@@ -188,7 +190,7 @@ class ProfilingUtils:
             """
 
             return np.dot(fingerprint, feature_vector_as_array) / (
-                        np.linalg.norm(fingerprint) * np.linalg.norm(feature_vector_as_array))
+                    np.linalg.norm(fingerprint) * np.linalg.norm(feature_vector_as_array))
 
         # Find the most similar fingerprint
         best_match = max(possible_fingerprints, key=lambda x: similarity(possible_fingerprints[x]))
