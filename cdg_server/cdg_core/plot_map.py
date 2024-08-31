@@ -9,7 +9,7 @@ Example usage:
 import folium
 import os
 
-from CDGeB1.data_classes import ProbeClient, DataCenter
+from .data_classes import ProbeClient, DataCenter
 
 
 class MapBuilder:

@@ -4,11 +4,11 @@ import numpy as np
 from rich.console import Console
 from rich.table import Table
 
-from CDGeB1.CloudServiceUtils import *
-from CDGeB1.GeolocationUtils import MultilaterationUtils, ProfilingUtils
-from CDGeB1.data_classes import *
-from CDGeB1.plot_map import MapBuilder
-from CDGeB1.parsers import *
+from .CloudServiceUtils import *
+from .GeolocationUtils import MultilaterationUtils, ProfilingUtils
+from .data_classes import *
+from .plot_map import MapBuilder
+from .parsers import *
 
 METHOD_SUBTRACTION = "Subtraction"
 METHOD_OPTIMIZATION = "Optimization"
@@ -278,8 +278,8 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         input_dir = sys.argv[1]
     else:
-        # Run from src. (python -m CDGeB1.main)
-        input_dir = 'Datasets/DS-B1/'
+        # Run from src. (python -m cdg_core.main)
+        input_dir = '../Datasets/DS-B1/'
 
     if len(sys.argv) > 2:
         output_dir = sys.argv[2]

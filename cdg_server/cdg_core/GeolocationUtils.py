@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
-from CDGeB1.data_classes import Continent, FrontEnd, DataFile, DataCenter
-from CDGeB1.CloudServiceUtils import haversine
+from .data_classes import Continent, FrontEnd, DataFile, DataCenter
+from .CloudServiceUtils import haversine
 
 from typing import TypeAlias
 

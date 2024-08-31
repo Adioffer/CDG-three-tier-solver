@@ -2,7 +2,8 @@ out/
 **/__pycache__/
 .vscode/
 tmp/
-webappstorage/
+**/webappstorage/sessions/**
 *.idea/
 *.zip
 **/api-client-out/*/*
+bin/

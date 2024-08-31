@@ -1,8 +1,8 @@
 import os
 import csv
-from statistics import mean, median
+from statistics import mean
 
-from CDGeB1.data_classes import *
+from .data_classes import *
 
 __all__ = ['check_files_exist', 'is_testing_mode', 'parse_datacenters', 'parse_servers_1party', 'parse_servers_3party',
            'parse_measurements_1party', 'parse_measurements_3party', 'parse_solution', ]

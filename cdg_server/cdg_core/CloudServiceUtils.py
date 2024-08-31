@@ -1,5 +1,5 @@
 import numpy as np
-from CDGeB1.data_classes import *
+from .data_classes import *
 import warnings
 from scipy.optimize import minimize
 from numpy import square
