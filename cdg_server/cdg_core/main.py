@@ -128,7 +128,8 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
         table = Table(title="Geolocation Results", show_header=True, header_style="bold cyan")
 
         table.add_column("File Name", justify="center")
-        table.add_column("Taget", justify="center")
+        table.add_column("Target", justify="center")
+        table.add_column("Estimated Location", justify="center")
         table.add_column("Geolocation Error [km]", justify="center")
         table.add_column("Closest Frontend", justify="center")
         table.add_column("Closest Frontend Error [km]", justify="center")
@@ -205,7 +206,7 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
             closest_error = haversine(closest_datacenter.coordinates, true_file_coordinates)
 
             errors.append((geolocation_error, closest_error))
-            table.add_row(target_file.name, true_file_datacenter.name,
+            table.add_row(target_file.name, true_file_datacenter.name, closest_datacenter.name,
                           str(round(geolocation_error, 2)), str(closest_datacenter.name == true_file_datacenter.name),
                           str(round(closest_error, 2))
                           )
