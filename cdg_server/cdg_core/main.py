@@ -162,8 +162,9 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
                               if k[1] == target_file and k[0].datacenter != k[1].datacenter}
         if testing_mode:
             frontend_in_same_datacenter = [fe for fe in cdgeb_utils_3party.frontend_servers
-                                           if fe.datacenter == cdgeb_utils_3party.solutions[target_file]][0]
-            delays_from_server.pop(frontend_in_same_datacenter)
+                                           if fe.datacenter == cdgeb_utils_3party.solutions[target_file]]
+            if len(frontend_in_same_datacenter) > 0:
+                delays_from_server.pop(frontend_in_same_datacenter[0])
 
         # Geolocation
         if geolocation_method == METHOD_MULTILATERATION:
