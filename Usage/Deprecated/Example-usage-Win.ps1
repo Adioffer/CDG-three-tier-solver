@@ -13,7 +13,7 @@ if (!(Test-Path -Path "output")) {
 }
 
 # First POST request
-$uri = "https://cdgeo.net/rest"
+$uri = "https://127.0.0.1:5000/rest"
 cmd /c curl $uri -X POST -H "Content-Type: multipart/form-data" -F "measurements=@$measurements" -F "servers=@$servers" -F "solution=@$solution" -o "output/output.json"
 
 # Second GET request

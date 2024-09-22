@@ -6,6 +6,9 @@ Three-tier Solver is a repo that contains the datasets, solving algorithms, Web 
 The research paper can be found at [TBD]().
 
 
+## Requirements
+- Python 3.11 or higher
+
 ## Configuration
 ```
 cd cdg_server

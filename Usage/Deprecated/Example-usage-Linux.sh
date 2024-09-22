@@ -1,5 +1,7 @@
 #!/bin/bash
 
+url="http://127.0.0.1:5000/rest"
+
 # Declare constants (change these as needed)
 DATASET="BGU" # BGU, Fujitsu-1, Fujitsu-2
 REQUESTED_FILE_NAME="results.txt" # "results.txt", "map_all_targets.html", "map_cdgeb-file-01_estimated.html", ...
@@ -13,7 +15,7 @@ solution="./$DATASET/solution.csv"
 mkdir -p output
 
 # First POST request
-curl -X POST -F "measurements=@$measurements" -F "servers=@$servers" -F "solution=@$solution" https://cdgeo.net/rest --output output/output.json
+curl -X POST -F "measurements=@$measurements" -F "servers=@$servers" -F "solution=@$solution" $url --output output/output.json
 
 # Second GET request
 jq_query=".Assets.\"$REQUESTED_FILE_NAME\""

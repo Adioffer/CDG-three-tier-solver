@@ -22,4 +22,4 @@ To use the algorithm with DS-F3 as 1st-party, and DS-F4 as 3rd-party:
 - use DS-F4/measurements-3party.csv as measurements-3party.csv
 - use DS-F4/servers-3party.csv as servers-3party.csv
 - use DS-F4/data_centers.csv as data_centers.csv
-- optionally, use DS-F/solution.csv as solution.csv to test the accuracy
+- optionally, use DS-F4/solution.csv as solution.csv to test the accuracy
