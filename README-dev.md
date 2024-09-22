@@ -1,13 +1,14 @@
 ## Misc (Developers section)
 
 ### Future work
+- [ ] Add "Save output to file" flag (instead of always saving to file).
 - [ ] Remove statistics of multilateration method in case profiling method is selected.
 - [ ] Skip transmission rates calculation if not needed (when profiling and optimization methods are both selected).
 - [ ] Use logging module.
 - [ ] Add more input validation.
 - [ ] Add more error handling.
 - [ ] Add documentation and visualization.
-- [ ] Document future work in GitHb issues ;)
+- [ ] Document future work in GitHub issues :]
 
 ### Run the algorithm locally:
 ```

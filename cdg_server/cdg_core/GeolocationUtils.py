@@ -147,9 +147,10 @@ class ProfilingUtils:
 
         fingerprints = dict()
         for (frontend, file), delay in measurements_2hop.items():
-            if frontend.datacenter not in fingerprints:
-                fingerprints[frontend.datacenter] = dict()
-            fingerprints[frontend.datacenter][file.datacenter] = delay
+            if file.datacenter not in fingerprints:
+                fingerprints[file.datacenter] = dict()
+            fingerprints[file.datacenter][frontend.datacenter] = delay
+            fingerprints[file.datacenter][frontend.datacenter] = delay
 
         self.csp_fingerprints = fingerprints
         return fingerprints
