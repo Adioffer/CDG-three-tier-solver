@@ -7,3 +7,4 @@ tmp/
 *.zip
 **/api-client-out/*/*
 bin/
+results.txt
