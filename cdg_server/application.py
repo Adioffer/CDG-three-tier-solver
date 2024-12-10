@@ -52,8 +52,8 @@ def upload_files():
         if rtt_method not in ['Subtraction', 'Optimization']:
             return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimization.'
 
-        if geolocation_method not in ['Multilateration', 'Profiling']:
-            return 'Invalid geolocation method. Please select either Multilateration or Profiling.'
+        if geolocation_method not in ['Multilateration', 'Fingerprinting']:
+            return 'Invalid geolocation method. Please select either Multilateration or Fingerprinting.'
 
         # Make new folder with uniquely generated name inside session directory
         session_dir = tempfile.mkdtemp(dir=SESSIONS_DIR)
@@ -135,8 +135,8 @@ def rest_api():
     if rtt_method not in ['Subtraction', 'Optimization']:
         return 'Invalid 2-hop RTT extraction method. Please select either Subtraction or Optimization.'
 
-    if geolocation_method not in ['Multilateration', 'Profiling']:
-        return 'Invalid geolocation method. Please select either Multilateration or Profiling.'
+    if geolocation_method not in ['Multilateration', 'Fingerprinting']:
+        return 'Invalid geolocation method. Please select either Multilateration or Fingerprinting.'
 
     domain_name = request.headers.get('Host')
     if domain_name is None:

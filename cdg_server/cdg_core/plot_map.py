@@ -65,10 +65,11 @@ class MapBuilder:
         self.map.save(os.path.join(path, self.map_name))
 
 
-def make_map_with_all_frontends():
+def make_map_with_all_frontends(path):
     map = MapBuilder('all_frontends')
     map.add_probes()
     map.add_datacenter()
-    map.save_map()
+    map.save_map(path)
 
-# make_map_with_all_frontends()
+
+# make_map_with_all_frontends('temp')

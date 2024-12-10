@@ -129,9 +129,9 @@ class MultilaterationUtils:
         return self._geolocate_using_scipy(distances)
 
 
-class ProfilingUtils:
+class FingerprintingUtils:
     """
-    This class is a utility class for geolocating a target using profiling-based method.
+    This class is a utility class for geolocating a target using fingerprinting-based method.
     Note that 1-st party fingerprints might contain more datacenters than in the 3-party case.
     """
 

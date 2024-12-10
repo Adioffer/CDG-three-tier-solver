@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .CloudServiceUtils import *
-from .GeolocationUtils import MultilaterationUtils, ProfilingUtils
+from .GeolocationUtils import MultilaterationUtils, FingerprintingUtils
 from .data_classes import *
 from .plot_map import MapBuilder
 from .parsers import *
@@ -13,7 +13,7 @@ from .parsers import *
 METHOD_SUBTRACTION = "Subtraction"
 METHOD_OPTIMIZATION = "Optimization"
 METHOD_MULTILATERATION = "Multilateration"
-METHOD_PROFILING = "Profiling"
+METHOD_FINGERPRINTING = "Fingerprinting"
 
 
 def parse_input_files(input_dir, testing_mode=False):
@@ -55,7 +55,7 @@ def validate_inputs(cdgeb_utils_1party, cdgeb_utils_3party, rtt_method, geolocat
         print("[ERROR] Invalid 2-hop RTT extraction method:", rtt_method)
         return False
 
-    if geolocation_method not in [METHOD_MULTILATERATION, METHOD_PROFILING]:
+    if geolocation_method not in [METHOD_MULTILATERATION, METHOD_FINGERPRINTING]:
         print("[ERROR] Invalid geolocation method:", geolocation_method)
         return False
 
@@ -150,8 +150,8 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
         csp_geolocator = MultilaterationUtils(cdgeb_utils_3party.frontend_servers,
                                               csp_rates=cdgeb_utils_3party.csp_rates)
     else:
-        # geolocation_method == METHOD_PROFILING
-        csp_geolocator = ProfilingUtils(cdgeb_utils_1party.datacenters)
+        # geolocation_method == METHOD_FINGERPRINTING
+        csp_geolocator = FingerprintingUtils(cdgeb_utils_1party.datacenters)
         csp_geolocator.create_1party_fingerprints(cdgeb_utils_1party.csp_delays)
 
     errors = []
@@ -171,7 +171,7 @@ def geolocate_from_data(output_dir, cdgeb_utils_1party, cdgeb_utils_3party, geol
             estimated_location = csp_geolocator.geolocate_target(delays_from_server)
             closest_datacenter = cdgeb_utils_3party.position_correction(estimated_location)
         else:
-            # geolocation_method == METHOD_PROFILING
+            # geolocation_method == METHOD_FINGERPRINTING
             feature_vector = csp_geolocator.evaluate_feature_vector(delays_from_server)
             closest_datacenter = csp_geolocator.match_feature_vector_to_fingerprint(feature_vector,
                                                                                     cdgeb_utils_3party.possible_file_datacenters)
